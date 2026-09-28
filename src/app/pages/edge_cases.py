@@ -79,7 +79,7 @@ def _show_series(fname, label_prefix, idx_key):
             continue
         scores_list.append(scores[0][0])
         val = det_vus_map.get(det, float('nan'))
-        names_list.append(f"{det} ({val:.3f})")
+        names_list.append(f"{det}<br>{val:.3f}")
 
     row = metrics_enriched[metrics_enriched['File Name'] == fname].iloc[0] if not metrics_enriched[metrics_enriched['File Name'] == fname].empty else None
     avg_val = (

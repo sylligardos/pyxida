@@ -16,20 +16,42 @@ Both **univariate** (`uni`) and **multivariate** (`multi`) variants are included
 
 See the [official TSB-AD repository](https://github.com/thedatumorg/TSB-AD) for the full benchmark description and data downloads.
 
+This repo provides:
+
+- A **Python parser** (`tsbadparser`) for loading time series, scores, metrics, and splits
+- An **interactive Streamlit explorer app** for inspecting results, comparing detectors, and browsing anomalies
+
+```bash
+streamlit run src/app/explorer.py
+```
+
 ## Repository layout
 
 ```
-TSB-AD/
+tsb-ad-parser/
 ├── data/
-│   ├── raw/uni|multi/        # Raw time series CSVs (values + label column)  [gitignored]
-│   ├── scores/uni|multi/     # Per-detector .npy score files                 [gitignored]
-│   ├── metrics/uni|multi/    # Per-detector metric CSVs                      [gitignored]
-│   ├── runtime/uni|multi/    # Per-detector runtime CSVs                     [gitignored]
-│   └── splits/               # Official TSB-AD-U / TSB-AD-M split CSVs
-├── src/tsbadparser/          # The parser package
-├── tests/                    # Parser unit tests
-├── environment.yml           # Conda environment
-└── pyproject.toml            # Makes tsbadparser pip-installable
+│   ├── raw/uni|multi/                    # Raw time series CSVs (values + label column)  [gitignored]
+│   ├── scores/uni|multi/                 # Per-detector .npy score files                 [gitignored]
+│   ├── metrics/uni|multi/                # Per-detector metric CSVs                      [gitignored]
+│   ├── runtime/uni|multi/                # Per-detector runtime CSVs                     [gitignored]
+│   ├── splits/                           # Official TSB-AD-U / TSB-AD-M split CSVs
+│   ├── anomaly_features_uni.parquet      # Precomputed anomaly features (uni)            [gitignored]
+│   └── anomaly_features_multi.parquet    # Precomputed anomaly features (multi)          [gitignored]
+├── src/
+│   ├── app/                              # Streamlit explorer app
+│   │   ├── explorer.py                   # Entry point
+│   │   ├── precompute.py                 # One-time feature precomputation
+│   │   ├── utils.py                      # Shared helpers and plot utilities
+│   │   └── pages/
+│   │       ├── global_summary.py         # Benchmark-wide performance overview
+│   │       ├── edge_cases.py             # Hardest / easiest series viewer
+│   │       ├── series_browser.py         # Random sampling + saved-series review
+│   │       └── anomaly_clusters.py       # Per-anomaly clustering and inspection
+│   └── tsbadparser/                      # The parser package
+├── tests/                                # Parser unit tests
+├── saved_series.json                     # User-bookmarked series
+├── environment.yml                       # Conda environment
+└── pyproject.toml                        # Makes tsbadparser pip-installable
 ```
 
 The bulk of the data (raw/, scores/, metrics/, runtime/) is gitignored because of its size. Only the split CSVs are tracked.
@@ -55,6 +77,38 @@ conda activate tsbad
 ```
 
 This installs `tsbadparser` as an editable package. `from tsbadparser import TSBADParser` is available in any script run under the `tsbad` environment, without any extra install step.
+
+## Explorer app
+
+An interactive Streamlit app for exploring the benchmark. It has four pages:
+
+| Page | What it shows |
+|------|---------------|
+| **Global Summary** | Benchmark-wide box plots and heatmaps (per dataset, per entity type) for any metric, from both a time-series and a detector perspective |
+| **Edge Cases** | The hardest and easiest series (or detector edge cases) for a chosen metric, with a Prev / Next viewer |
+| **Series Browser** | Randomly sample or review bookmarked series; shows anomaly labels and detector scores side by side |
+| **Anomaly Clusters** | Per-anomaly detectability ranking, grouping by best detector, and PCA + KMeans clustering with click-to-inspect |
+
+A **Kind** selector (`uni` / `multi`) is present in the sidebar of every page.
+
+### 1. Precompute anomaly features (one-time, per kind)
+
+The Anomaly Clusters page requires a precomputed parquet file. Run once per kind you want to explore:
+
+```bash
+# from the project root
+python src/app/precompute.py --kind uni   # → data/anomaly_features_uni.parquet
+python src/app/precompute.py --kind multi # → data/anomaly_features_multi.parquet
+```
+
+### 2. Launch the app
+
+```bash
+# from the project root
+streamlit run src/app/explorer.py
+```
+
+---
 
 ## Usage
 

@@ -218,6 +218,51 @@ def test_load_scores_shape_consistency(parser_uni):
         assert score.shape[1] == ts.shape[0], f"Score length mismatch for {fname}"
 
 
+def test_load_scores_respects_input_order(parser_uni):
+    """Scores must come back in the caller's filename order, not sorted order.
+
+    Regression test: load_scores used to iterate a pandas groupby, which sorts
+    by key, so an unsorted `filenames` argument silently returned misaligned
+    scores.
+    """
+    fnames = parser_uni.meta[parser_uni.meta.dataset == "NAB"].filename.tolist()
+    forward, _ = parser_uni.load_scores(detectors=["IForest"], filenames=fnames, njobs=4)
+    reverse, _ = parser_uni.load_scores(detectors=["IForest"], filenames=fnames[::-1], njobs=4)
+
+    assert len(forward) == len(reverse)
+    forward_lengths = [s.shape[1] for s in forward]
+    reverse_lengths = [s.shape[1] for s in reverse]
+    assert reverse_lengths == forward_lengths[::-1], "Input filename order was ignored"
+
+
+def test_load_scores_return_filenames_alignment(parser_uni):
+    """return_filenames must give back exactly the series that survived.
+
+    Lag_Llama is missing on roughly 5% of series, so this call drops some.
+    Without the filename list the caller cannot tell which ones came back.
+    """
+    fnames = parser_uni.meta[parser_uni.meta.dataset == "NAB"].filename.tolist()
+    kept, scores, bad = parser_uni.load_scores(
+        detectors=["IForest", "Lag_Llama"],
+        filenames=fnames,
+        njobs=4,
+        return_filenames=True,
+    )
+
+    assert len(kept) == len(scores), "Filenames and scores are not aligned"
+    assert set(kept) <= set(fnames)
+    assert all(k.replace(".csv", ".npy") not in bad for k in kept)
+
+    # Each returned array must really be the scores of the file it is named after
+    for fname, score_matrix in zip(kept, scores):
+        expected = np.load(
+            parser_uni.scores_path / "IForest" / fname.replace(".csv", ".npy")
+        )
+        assert np.allclose(score_matrix[0], expected), f"Wrong scores for {fname}"
+
+    print(f"\nreturn_filenames: {len(kept)} kept of {len(fnames)}, {len(bad)} dropped")
+
+
 # ---------------------------------------------------------------------------
 # load_scores_and_delete
 # ---------------------------------------------------------------------------

@@ -347,8 +347,12 @@ class TSBADParser:
         filenames: Optional[list[str]] = None,
         njobs: Optional[int] = None,
         drop_missing: bool = True,
-    ) -> tuple[list[np.ndarray], list[str]]:
+        return_filenames: bool = False,
+    ) -> tuple[list[np.ndarray], list[str]] | tuple[list[str], list[np.ndarray], list[str]]:
         """Load pre-computed anomaly scores for a set of detectors and files.
+
+        The returned scores follow the order of the `filenames` argument, and
+        rows within each array follow the order of the `detectors` argument.
 
         Args:
             detectors:    Detectors to load. Defaults to get_detectors().
@@ -358,11 +362,19 @@ class TSBADParser:
             drop_missing: If True, drop any time series that is missing scores
                           for at least one detector. If False, include partial
                           entries but still drop NaN-containing scores.
+            return_filenames: If True, also return the CSV filenames that
+                          survived, aligned element-wise with the scores. Use
+                          this whenever some series may be dropped, otherwise
+                          there is no way to tell which ones came back.
 
         Returns:
-            Tuple of (grouped_scores, problematic_files).
-            grouped_scores: list of 2-D arrays of shape (n_detectors, T), one
-                            per time series.
+            (grouped_scores, problematic_files), or
+            (kept_filenames, grouped_scores, problematic_files) when
+            return_filenames=True.
+
+            kept_filenames:    CSV filenames aligned with grouped_scores.
+            grouped_scores:    list of 2-D arrays of shape (n_detectors, T),
+                               one per time series, in input order.
             problematic_files: list of .npy filenames that were skipped.
         """
         grouped_scores = []
@@ -394,7 +406,15 @@ class TSBADParser:
             valid_idx = [i for i in df_scores.index if i not in none_rows.index]
             df_scores = df_scores.loc[valid_idx]
 
-        for name, group in df_scores.groupby("filename"):
+        # Iterate in the caller's filename order, not pandas' sorted order, so
+        # grouped_scores[i] always corresponds to filenames[i] minus drops.
+        groups = dict(list(df_scores.groupby("filename", sort=False)))
+
+        kept_filenames = []
+        for name in filenames:
+            group = groups.get(name)
+            if group is None:
+                continue
             curr_group = list(group.score)
             equal_lengths = np.all([x.shape == curr_group[0].shape for x in curr_group])
             if not equal_lengths:
@@ -403,8 +423,11 @@ class TSBADParser:
             if any(np.isnan(score).any() for score in curr_group):
                 problematic_files.append(name)
                 continue
-            grouped_scores.append(np.stack(list(group.score)))
+            grouped_scores.append(np.stack(curr_group))
+            kept_filenames.append(name.replace(".npy", ".csv"))
 
+        if return_filenames:
+            return kept_filenames, grouped_scores, problematic_files
         return grouped_scores, problematic_files
 
     def load_runtime(self, models: Optional[list[str]] = None) -> pd.DataFrame:

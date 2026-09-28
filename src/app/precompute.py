@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.utils import build_anomaly_table, THRESHOLDS, BUFFERS
+from app.utils import build_anomaly_table
 from tsbadparser import TSBADParser
 
 

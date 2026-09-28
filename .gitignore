@@ -34,3 +34,18 @@ data/runtime/multi/*
 .idea/
 .vscode/
 *.swp
+
+# ── Local notes ───────────────────────────────────────────────────────────────
+TODO.md
+
+# Reviewer notes taken in the demo -- personal, not part of the repo
+demo_notes.json
+
+# Private planning notes, paper symlink and third-party PDFs -- never public
+references/
+# Local Claude Code settings
+.claude/
+
+# Derived tables (regenerable; divergence is ~4GB)
+data/divergence/
+data/anomaly_features_*.parquet

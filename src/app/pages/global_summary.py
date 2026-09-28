@@ -93,7 +93,7 @@ def render_per_dataset():
     )
     col_means = dataset_perf.mean(axis=0).sort_values(ascending=True)
     dataset_perf = dataset_perf[col_means.index]
-    col_labels = [f"{n}\n{v:.2f}" for n, v in col_means.items()]
+    col_labels = [f"{n}  ({v:.2f})" for n, v in col_means.items()]
 
     fig2 = go.Figure(go.Heatmap(
         z=dataset_perf.values,
@@ -107,8 +107,8 @@ def render_per_dataset():
     fig2.update_layout(
         title=f"Mean {metric} per Model and Dataset",
         height=max(400, 25 * len(order)),
-        margin=dict(l=160, b=100),
-        xaxis=dict(tickangle=0),
+        margin=dict(l=160, b=150),
+        xaxis=dict(tickangle=-60, tickfont=dict(size=11)),
         font=dict(size=13),
     )
     st.plotly_chart(fig2, width='stretch')
@@ -125,7 +125,7 @@ def render_per_entity_type():
     )
     type_col_means = type_perf.mean(axis=0).sort_values(ascending=True)
     type_perf = type_perf[type_col_means.index]
-    type_labels = [f"{n}\n{v:.2f}" for n, v in type_col_means.items()]
+    type_labels = [f"{n}  ({v:.2f})" for n, v in type_col_means.items()]
 
     fig3 = go.Figure(go.Heatmap(
         z=type_perf.values,
@@ -139,113 +139,27 @@ def render_per_entity_type():
     fig3.update_layout(
         title=f"Mean {metric} per Model and Entity Type",
         height=max(400, 25 * len(order)),
-        margin=dict(l=160, b=100),
-        xaxis=dict(tickangle=0),
+        margin=dict(l=160, b=150),
+        xaxis=dict(tickangle=-60, tickfont=dict(size=11)),
         font=dict(size=13),
     )
     st.plotly_chart(fig3, width='stretch')
 
 
-def render_detector_x_dataset():
-    detectors = parser.get_detectors()
-    detector_metrics = metrics_enriched[metrics_enriched['Model Name'].isin(detectors)]
-    detector_order = (
-        detector_metrics.groupby('Model Name')[metric]
-        .mean()
-        .sort_values(ascending=False)
-        .index.tolist()
-    )
-
-    det_dataset_perf = (
-        detector_metrics.groupby(['Model Name', 'dataset'])[metric]
-        .mean()
-        .unstack('dataset')
-        .reindex(detector_order)
-    ).T
-    col_means = det_dataset_perf.mean(axis=0).sort_values(ascending=True)
-    det_dataset_perf = det_dataset_perf[col_means.index]
-    col_labels = [f"{n}\n{v:.2f}" for n, v in col_means.items()]
-
-    fig4 = go.Figure(go.Heatmap(
-        z=det_dataset_perf.values,
-        x=col_labels,
-        y=det_dataset_perf.index.tolist(),
-        colorscale='YlGnBu',
-        text=[[f"{v:.2f}" if pd.notna(v) else "" for v in row] for row in det_dataset_perf.values],
-        texttemplate="%{text}",
-        showscale=True,
-    ))
-    fig4.update_layout(
-        title=f"Detector Mean {metric} per Dataset",
-        height=max(400, 30 * len(det_dataset_perf)),
-        margin=dict(l=100, b=140),
-        xaxis=dict(tickangle=90),
-        font=dict(size=13),
-    )
-    st.plotly_chart(fig4, width='stretch')
-
-
-def render_detector_x_entity_type():
-    detectors = parser.get_detectors()
-    detector_metrics = metrics_enriched[metrics_enriched['Model Name'].isin(detectors)]
-    detector_order = (
-        detector_metrics.groupby('Model Name')[metric]
-        .mean()
-        .sort_values(ascending=False)
-        .index.tolist()
-    )
-
-    det_type_perf = (
-        detector_metrics.groupby(['Model Name', 'entity_type'])[metric]
-        .mean()
-        .unstack('entity_type')
-        .reindex(detector_order)
-    ).T
-    type_col_means = det_type_perf.mean(axis=0).sort_values(ascending=True)
-    det_type_perf = det_type_perf[type_col_means.index]
-    type_labels = [f"{n}\n{v:.2f}" for n, v in type_col_means.items()]
-
-    fig5 = go.Figure(go.Heatmap(
-        z=det_type_perf.values,
-        x=type_labels,
-        y=det_type_perf.index.tolist(),
-        colorscale='YlOrRd',
-        text=[[f"{v:.2f}" if pd.notna(v) else "" for v in row] for row in det_type_perf.values],
-        texttemplate="%{text}",
-        showscale=True,
-    ))
-    fig5.update_layout(
-        title=f"Detector Mean {metric} per Entity Type",
-        height=max(400, 30 * len(det_type_perf)),
-        margin=dict(l=100, b=140),
-        xaxis=dict(tickangle=90),
-        font=dict(size=13),
-    )
-    st.plotly_chart(fig5, width='stretch')
-
-
 # ---------------------------------------------------------------------------
 # Render via tabs
 # ---------------------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab_overall, tab_dataset, tab_entity = st.tabs([
     "Overall Performance",
-    "Per Dataset",
-    "Per Entity Type",
     "Detector × Dataset",
     "Detector × Entity Type",
 ])
 
-with tab1:
+with tab_overall:
     render_overall_performance()
 
-with tab2:
+with tab_dataset:
     render_per_dataset()
 
-with tab3:
+with tab_entity:
     render_per_entity_type()
-
-with tab4:
-    render_detector_x_dataset()
-
-with tab5:
-    render_detector_x_entity_type()

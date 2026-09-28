@@ -1,3 +1,10 @@
+"""Anomalies, page 3: do anomalies group by which detectors find them?
+
+Clusters anomalies on their detector-density profile, then lets you colour the
+projection by anomaly properties to see whether the clusters line up with
+anything nameable. Click a point to inspect that anomaly.
+"""
+
 import sys
 from pathlib import Path
 
@@ -5,300 +12,184 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 import numpy as np
 import pandas as pd
-import streamlit as st
+import plotly.colors as pc
 import plotly.graph_objects as go
+import streamlit as st
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-from app.utils import get_kind, get_parser, cached_meta, plot_series_plotly
+from app.utils import (
+    anomaly_page_setup, cached_detection_wide, chart_selection,
+    detection_detectors, detector_heatmap, render_anomaly_inspector,
+)
 
 st.title("Anomaly Clusters")
 
-# ---------------------------------------------------------------------------
-# Kind selector (must come before parquet guard so the error message is accurate)
-# ---------------------------------------------------------------------------
-kind = get_kind()
-parquet_path = Path(f"data/anomaly_features_{kind}.parquet")
-
-# ---------------------------------------------------------------------------
-# Parquet guard
-# ---------------------------------------------------------------------------
-if not parquet_path.exists():
-    st.error(f"Run:  python src/app/precompute.py --kind {kind}")
+setup = anomaly_page_setup()
+if setup is None:
     st.stop()
+kind, buffer, df_all, df_filtered, detectors = setup
 
-
-# ---------------------------------------------------------------------------
-# Cached loaders
-# ---------------------------------------------------------------------------
-@st.cache_data
-def load_features(kind: str) -> pd.DataFrame:
-    return pd.read_parquet(f"data/anomaly_features_{kind}.parquet")
-
-
-@st.cache_data
-def run_pca_kmeans(df_hash: int, n_clusters: int, detector_cols: tuple, kind: str) -> pd.DataFrame:
-    df = load_features(kind)
-    X = df[list(detector_cols)].fillna(0).values
-    X_scaled = StandardScaler().fit_transform(X)
-    n_clusters = min(n_clusters, len(df))
-    cluster_labels = KMeans(n_clusters=n_clusters, random_state=42, n_init=10).fit_predict(X_scaled)
-    pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(X_scaled)
-    return df.assign(PC1=X_pca[:, 0], PC2=X_pca[:, 1], cluster=cluster_labels)
-
-
-# ---------------------------------------------------------------------------
-# Load data
-# ---------------------------------------------------------------------------
-df_all = load_features(kind)
-detectors = [c for c in df_all.columns if c not in {
-    'filename', 'dataset', 'entity_type', 'anomaly_idx',
-    'start', 'end', 'length', 'overall_detectability', 'best_detector',
-    'PC1', 'PC2', 'cluster',
-}]
-
-# ---------------------------------------------------------------------------
-# Sidebar
-# ---------------------------------------------------------------------------
 with st.sidebar:
-    n_clusters = st.slider("Number of clusters", min_value=2, max_value=12, value=6)
-    all_datasets = sorted(df_all['dataset'].unique().tolist())
-    all_entity_types = sorted(df_all['entity_type'].unique().tolist())
-    sel_datasets = st.multiselect("Dataset", all_datasets, default=all_datasets)
-    sel_entity_types = st.multiselect("Entity Type", all_entity_types, default=all_entity_types)
-    top_k = st.slider("Top K (rank view)", min_value=1, max_value=50, value=10)
+    n_clusters = st.slider("Number of clusters", 2, 12, 6)
 
-# ---------------------------------------------------------------------------
-# Filter
-# ---------------------------------------------------------------------------
-df = df_all[
-    df_all['dataset'].isin(sel_datasets) &
-    df_all['entity_type'].isin(sel_entity_types)
+
+def _quantile_bin(series: pd.Series, n_bins: int = 5) -> pd.Categorical:
+    """Quantile-bin a series, labelling groups from the actual boundaries."""
+    _, boundaries = pd.qcut(series, n_bins, retbins=True, duplicates='drop')
+    labels = [f"{int(round(boundaries[i]))}-{int(round(boundaries[i + 1]))}"
+              for i in range(len(boundaries) - 1)]
+    return pd.qcut(series, n_bins, labels=labels, duplicates='drop')
+
+
+def _length_bin(series: pd.Series) -> pd.Categorical:
+    """Bin anomaly length, keeping point anomalies as their own group.
+
+    Length 1 is most of the benchmark, so plain quantile binning collapses to
+    two groups and hides all the structure in the subsequence tail.
+    """
+    tail = series[series > 1]
+    if tail.empty:
+        return pd.cut(series, bins=[0, 1], labels=["Point (1)"], include_lowest=True)
+    _, raw = pd.qcut(tail, 4, retbins=True, duplicates='drop')
+    bounds = [int(round(b)) for b in raw]
+    bounds[0] = 2
+    labels = ["Point (1)"] + [
+        f"{bounds[i] if i == 0 else bounds[i] + 1}-{bounds[i + 1]}"
+        for i in range(len(bounds) - 1)
+    ]
+    return pd.cut(series, bins=[0, 1] + bounds[1:], labels=labels, include_lowest=True)
+
+
+def _discrete_colorscale(palette: list[str], n: int) -> list:
+    scale = []
+    for i in range(n):
+        color = palette[i % len(palette)]
+        scale += [[i / n, color], [(i + 1) / n, color]]
+    return scale
+
+
+@st.cache_data(show_spinner="Clustering anomalies ...")
+def cluster_anomalies(kind: str, buffer: int, n_clusters: int) -> pd.DataFrame:
+    """PCA + KMeans on the detector-density profile of every anomaly.
+
+    Fitted on the whole benchmark, not the sidebar selection, so clusters and
+    bin boundaries stay put while you filter.
+    """
+    df = cached_detection_wide(kind, buffer)
+    columns = detection_detectors(df)
+    features = StandardScaler().fit_transform(df[columns].fillna(0).values)
+
+    labels = KMeans(n_clusters=min(n_clusters, len(df)),
+                    random_state=42, n_init=10).fit_predict(features)
+    projected = PCA(n_components=2).fit_transform(features)
+
+    out = df.assign(PC1=projected[:, 0], PC2=projected[:, 1], cluster=labels)
+    out['type_label'] = np.where(out['length'] == 1, 'Point', 'Subsequence')
+    out = out.join(out.groupby('filename').size().rename('anomaly_count'), on='filename')
+    out['length_bin'] = _length_bin(out['length'])
+    out['anomaly_count_bin'] = _quantile_bin(out['anomaly_count'])
+    if 'ts_length' in out.columns:
+        out['ts_length_bin'] = _quantile_bin(out['ts_length'])
+    return out
+
+
+clustered = cluster_anomalies(kind, buffer, n_clusters)
+clustered = clustered[
+    clustered['dataset'].isin(df_filtered['dataset'].unique())
+    & clustered['entity_type'].isin(df_filtered['entity_type'].unique())
 ].reset_index(drop=True)
 
-if df.empty:
-    st.info("No data after filtering.")
+if clustered.empty:
+    st.info("No anomalies left after filtering.")
     st.stop()
 
-# ---------------------------------------------------------------------------
-# Tabs
-# ---------------------------------------------------------------------------
-tab_rank, tab_group, tab_cluster = st.tabs(["Rank", "Group by Detector", "Cluster"])
+COLOR_MODES = {
+    "Cluster": ("cluster", "categorical"),
+    "Point vs subsequence": ("type_label", "categorical"),
+    "Entity type": ("entity_type", "categorical"),
+    "Dataset": ("dataset", "categorical"),
+    "Anomaly length": ("length_bin", "binned"),
+    "Anomalies in series": ("anomaly_count_bin", "binned"),
+}
+if 'ts_length_bin' in clustered.columns:
+    COLOR_MODES["Series length"] = ("ts_length_bin", "binned")
 
-# ---------------------------------------------------------------------------
-# Rank tab
-# ---------------------------------------------------------------------------
-with tab_rank:
-    df_sorted = df.sort_values('overall_detectability').reset_index(drop=True)
-    n = len(df_sorted)
-    k = int(top_k)
+color_by = st.radio("Colour by", list(COLOR_MODES.keys()), horizontal=True,
+                    key="cluster_color_by")
+color_col, color_kind = COLOR_MODES[color_by]
 
-    # Histogram of detectability
-    fig_rank = go.Figure(go.Histogram(
-        x=df_sorted['overall_detectability'],
-        nbinsx=30,
-        marker_color='#aec7e8',
-        name='Anomalies',
-    ))
+categories = clustered[color_col].astype('category')
+codes = categories.cat.codes.tolist()
+names = [str(c) for c in categories.cat.categories.tolist()]
+n_categories = max(len(names), 1)
 
-    hardest_thresh = df_sorted['overall_detectability'].iloc[min(k - 1, n - 1)]
-    easiest_thresh = df_sorted['overall_detectability'].iloc[max(n - k, 0)]
-
-    fig_rank.add_vline(x=hardest_thresh, line_color='red', line_dash='dash',
-                       annotation_text=f"Top-{k} hardest", annotation_position="top left")
-    fig_rank.add_vline(x=easiest_thresh, line_color='green', line_dash='dash',
-                       annotation_text=f"Top-{k} easiest", annotation_position="top right")
-
-    fig_rank.update_layout(
-        xaxis_title='Overall Detectability',
-        yaxis_title='Count',
-        height=350,
-        margin=dict(l=60, r=20, t=40, b=40),
-        font=dict(size=13),
+if color_kind == "categorical":
+    colorscale = _discrete_colorscale(pc.qualitative.Safe, n_categories)
+else:
+    sequential = pc.sequential.YlOrRd
+    step = max(1, len(sequential) // n_categories)
+    colorscale = _discrete_colorscale(
+        [sequential[min(i * step, len(sequential) - 1)] for i in range(n_categories)],
+        n_categories,
     )
-    st.plotly_chart(fig_rank, width='stretch')
 
-    # Compact tables side by side
-    cols_show = ['filename', 'dataset', 'anomaly_idx', 'overall_detectability']
-    col_hard, col_easy = st.columns(2)
-    with col_hard:
-        st.markdown(f"**Top-{k} hardest** (lowest detectability)")
-        st.dataframe(
-            df_sorted.head(k)[cols_show].reset_index(drop=True),
-            use_container_width=True,
-        )
-    with col_easy:
-        st.markdown(f"**Top-{k} easiest** (highest detectability)")
-        st.dataframe(
-            df_sorted.tail(k).sort_values('overall_detectability', ascending=False)[cols_show].reset_index(drop=True),
-            use_container_width=True,
-        )
+hover = (
+    "File: " + clustered['filename']
+    + "<br>Anomaly #" + clustered['anomaly_idx'].astype(str)
+    + "<br>Length: " + clustered['length'].astype(str)
+    + "<br>Best: " + clustered['best_detector'].astype(str)
+    + "<br>" + color_by + ": " + clustered[color_col].astype(str)
+).tolist()
 
-# ---------------------------------------------------------------------------
-# Group by Detector tab
-# ---------------------------------------------------------------------------
-with tab_group:
-    col_left, col_right = st.columns(2)
+fig_scatter = go.Figure(go.Scattergl(
+    x=clustered['PC1'].tolist(), y=clustered['PC2'].tolist(),
+    mode='markers',
+    marker=dict(
+        size=5, opacity=0.7, color=codes, colorscale=colorscale,
+        cmin=-0.5, cmax=n_categories - 0.5,
+        colorbar=dict(tickvals=list(range(n_categories)), ticktext=names,
+                      thickness=15, title=dict(text=color_by, side='right')),
+    ),
+    hovertemplate='%{text}<extra></extra>', text=hover,
+))
+fig_scatter.update_layout(
+    title="Anomalies projected from their detector-density profile",
+    xaxis_title="PC1", yaxis_title="PC2",
+    height=520, margin=dict(l=60, r=160, t=50, b=50), font=dict(size=13),
+)
+event = st.plotly_chart(fig_scatter, on_select="rerun", selection_mode="points",
+                        key="cluster_scatter", width='stretch')
 
-    counts = df['best_detector'].value_counts().reindex(detectors, fill_value=0).sort_values(ascending=False)
-    with col_left:
-        fig_bar = go.Figure(go.Bar(x=counts.index.tolist(), y=counts.values, marker_color='#636efa'))
-        fig_bar.update_layout(
-            title='Anomaly count per best-performing detector',
-            xaxis_tickangle=70,
-            height=400,
-            margin=dict(b=120),
-            font=dict(size=13),
-        )
-        st.plotly_chart(fig_bar, width='stretch')
+st.caption(
+    "Two anomalies sit close together when the same detectors found them, and "
+    "far apart when different ones did. If a colouring lines up with the "
+    "clusters, that property explains part of which detector wins."
+)
 
-    heatmap_data = (
-        df.groupby('best_detector')[detectors]
-        .mean()
-        .reindex(detectors)
-        .dropna(how='all')
-    )
-    with col_right:
-        fig_hm = go.Figure(go.Heatmap(
-            z=heatmap_data.values,
-            x=heatmap_data.columns.tolist(),
-            y=heatmap_data.index.tolist(),
-            colorscale='YlGnBu',
-            text=[[f"{v:.2f}" if pd.notna(v) else "" for v in row] for row in heatmap_data.values],
-            texttemplate="%{text}",
-        ))
-        fig_hm.update_layout(
-            title='Mean detectability per group × detector',
-            height=400,
-            margin=dict(l=120, b=80),
-            xaxis_tickangle=70,
-            font=dict(size=13),
-        )
-        st.plotly_chart(fig_hm, width='stretch')
+cluster_means = clustered.groupby('cluster')[detectors].mean()
+cluster_means.index = [f"Cluster {c}  (n={int((clustered.cluster == c).sum()):,})"
+                       for c in cluster_means.index]
+st.plotly_chart(
+    detector_heatmap(cluster_means,
+                     title="Mean detection density per cluster",
+                     y_title="Cluster"),
+    width='stretch',
+)
 
 # ---------------------------------------------------------------------------
-# Cluster tab
+# Click to inspect
 # ---------------------------------------------------------------------------
-with tab_cluster:
-    df_clustered = run_pca_kmeans(hash(tuple(df.index.tolist())), n_clusters, tuple(detectors), kind)
-    df_clustered = df_clustered[
-        df_clustered['dataset'].isin(sel_datasets) &
-        df_clustered['entity_type'].isin(sel_entity_types)
-    ].reset_index(drop=True)
+points = chart_selection(event)
+if points:
+    index = points[0].get("point_index")
+    if index is not None and index < len(clustered):
+        row = clustered.iloc[index]
 
-    col_scatter, col_heatmap = st.columns(2)
-
-    with col_scatter:
-        unique_clusters = sorted(df_clustered['cluster'].unique())
-        scatter_traces = []
-        for c in unique_clusters:
-            mask = df_clustered['cluster'] == c
-            sub = df_clustered[mask]
-            scatter_traces.append(go.Scatter(
-                x=sub['PC1'], y=sub['PC2'],
-                mode='markers',
-                marker=dict(size=6, opacity=0.7),
-                name=f"Cluster {c}",
-                customdata=sub.index.tolist(),
-            ))
-        fig_scatter = go.Figure(data=scatter_traces)
-        fig_scatter.update_layout(
-            title='Anomalies in PCA space',
-            height=450,
-            margin=dict(l=40, r=20, t=50, b=40),
-            font=dict(size=13),
+        st.divider()
+        st.subheader("Selected anomaly")
+        render_anomaly_inspector(
+            kind, row, detectors,
+            subtitle=f"cluster {int(row['cluster'])}",
         )
-        event = st.plotly_chart(
-            fig_scatter,
-            on_select="rerun",
-            selection_mode="points",
-            key="cluster_scatter",
-            width='stretch',
-        )
-
-    with col_heatmap:
-        cluster_means = df_clustered.groupby('cluster')[detectors].mean()
-        fig_chm = go.Figure(go.Heatmap(
-            z=cluster_means.values,
-            x=cluster_means.columns.tolist(),
-            y=[f"Cluster {c}" for c in cluster_means.index],
-            colorscale='YlGnBu',
-            text=[[f"{v:.2f}" if pd.notna(v) else "" for v in row] for row in cluster_means.values],
-            texttemplate="%{text}",
-        ))
-        fig_chm.update_layout(
-            title='Mean detectability per cluster × detector',
-            height=450,
-            margin=dict(l=80, b=80),
-            xaxis_tickangle=70,
-            font=dict(size=13),
-        )
-        st.plotly_chart(fig_chm, width='stretch')
-
-    # ---------------------------------------------------------------------------
-    # Click-to-inspect
-    # ---------------------------------------------------------------------------
-    selection = event.selection if event else None
-    if selection and selection.get("points"):
-        point = selection["points"][0]
-        row_idx = point.get("point_index", None)
-        if row_idx is not None and row_idx < len(df_clustered):
-            row = df_clustered.iloc[row_idx]
-
-            st.divider()
-            st.subheader("Inspecting selected anomaly")
-
-            parser = get_parser(kind)
-            try:
-                fnames_loaded, timeseries_loaded, labels_loaded = parser.load_timeseries(filename=[row['filename']])
-            except ValueError:
-                st.error(f"Could not load {row['filename']}")
-                st.stop()
-
-            ts_full, lab_full = timeseries_loaded[0], labels_loaded[0]
-            T = len(ts_full)
-
-            ctx_start = int(max(0, row['start'] - 100))
-            ctx_end = int(min(T, row['end'] + 100))
-            ts_ctx = ts_full[ctx_start:ctx_end] if ts_full.ndim == 1 else ts_full[ctx_start:ctx_end, :]
-            lab_ctx = lab_full[ctx_start:ctx_end]
-
-            det_vals = {d: row[d] for d in detectors if pd.notna(row.get(d))}
-            top2_dets = sorted(det_vals, key=lambda d: det_vals[d], reverse=True)[:2]
-
-            det_scores_ctx = []
-            det_names_ctx = []
-            for det in top2_dets:
-                scores, problematic = parser.load_scores(
-                    detectors=[det], filenames=[row['filename']], drop_missing=False
-                )
-                npy = row['filename'].replace('.csv', '.npy')
-                if len(scores) == 0 or npy in problematic:
-                    continue
-                full_score = scores[0][0]
-                det_scores_ctx.append(full_score[ctx_start:ctx_end])
-                det_names_ctx.append(f"{det} ({det_vals[det]:.3f})")
-
-            fig_detail = plot_series_plotly(
-                ts_ctx, lab_ctx,
-                title=f"{row['filename']}  |  Anomaly #{int(row['anomaly_idx'])}  |  Cluster {int(row['cluster'])}",
-                detector_scores=det_scores_ctx or None,
-                detector_names=det_names_ctx or None,
-                context_start=ctx_start,
-            )
-            st.plotly_chart(fig_detail, width='stretch')
-
-            meta_info = {
-                'filename': row['filename'],
-                'dataset': row['dataset'],
-                'entity_type': row['entity_type'],
-                'anomaly_idx': int(row['anomaly_idx']),
-                'start': int(row['start']),
-                'end': int(row['end']),
-                'length': int(row['length']),
-                'cluster': int(row['cluster']),
-                'overall_detectability': float(row['overall_detectability']),
-            }
-            st.table(pd.DataFrame([meta_info]).T.rename(columns={0: 'value'}).astype(str))

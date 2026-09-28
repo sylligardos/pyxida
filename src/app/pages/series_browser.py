@@ -134,7 +134,7 @@ for det in show_detectors:
         continue
     det_scores_list.append(scores[0][0])
     row = metrics_df[(metrics_df['File Name'] == fname) & (metrics_df['Model Name'] == det)]
-    label = f"{det} ({row[metric].iloc[0]:.3f})" if not row.empty else det
+    label = f"{det}<br>{row[metric].iloc[0]:.3f}" if not row.empty else det
     det_names_list.append(label)
 
 # ---------------------------------------------------------------------------
