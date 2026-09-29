@@ -57,13 +57,14 @@ def metrics_for(label: np.ndarray, score: np.ndarray, device: str) -> dict:
     """The row TSB-AD's metric files hold for one detector on one series."""
     out = {}
     tic = time.perf_counter()
-    out["AUC-PR"] = average_precision_score(label, score)
+    out["AUC-PR"] = min(1.0, average_precision_score(label, score))
     out["AUC-PR Time cost"] = time.perf_counter() - tic
 
     (vus, _), vus_time = _get_metric(device).compute(label, score)
     for b in BUFFERS:
         v = vus[b]
-        out[f"VUS-PR (L: {b})"] = v.item() if hasattr(v, "item") else float(v)
+        # Clipped: float rounding gives 1.0000000000000002 on perfect detections.
+        out[f"VUS-PR (L: {b})"] = min(1.0, v.item() if hasattr(v, "item") else float(v))
     out["VUS-PR Time cost"] = vus_time
     return out
 

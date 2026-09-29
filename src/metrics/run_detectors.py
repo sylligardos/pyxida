@@ -90,16 +90,37 @@ def run(benchmark, kind, detectors, datasets=None, workers=14):
     jobs = [(parser.raw_path, parser.scores_path, r.filename, det, kind, int(r.train_length))
             for det in detectors for r in meta.itertuples()
             if not (parser.scores_path / det / r.filename.replace(".csv", ".npy")).exists()]
-    results = []
-    with Pool(workers) as pool:
-        for res in tqdm(pool.imap_unordered(_job, jobs), total=len(jobs), desc=f"{benchmark}/{kind}"):
-            results.append(res)
-
-    ok = [r for r in results if r[2] is not None]
-    bad = [r for r in results if r[2] is None]
     runtime_dir = parser.path / "runtime" / kind
     runtime_dir.mkdir(parents=True, exist_ok=True)
-    new = pd.DataFrame([{"File Name": f, "Model Name": d, "Time Cost": t, "Length": n} for f, d, t, n in ok])
+    log = parser.path / "_run_log.csv"
+    n_ok = n_bad = 0
+    pending = []
+    with Pool(workers) as pool:
+        for res in tqdm(pool.imap_unordered(_job, jobs), total=len(jobs), desc=f"{benchmark}/{kind}"):
+            pending.append(res)
+            # Saved as it goes: a killed run must not leave scores on disk
+            # without their runtimes, since a resumed run skips those series.
+            if len(pending) >= FLUSH_EVERY:
+                n_ok, n_bad = n_ok + sum(r[2] is not None for r in pending), n_bad + sum(r[2] is None for r in pending)
+                _flush(pending, kind, runtime_dir, log)
+                pending = []
+    n_ok, n_bad = n_ok + sum(r[2] is not None for r in pending), n_bad + sum(r[2] is None for r in pending)
+    _flush(pending, kind, runtime_dir, log)
+    print(f"{benchmark}/{kind}: {n_ok} scored, {n_bad} failed or skipped "
+          f"({len(meta)} series x {len(detectors)} detectors; failures in _run_log.csv)")
+
+
+FLUSH_EVERY = 20
+LOG_COLUMNS = ["kind", "file_name", "detector", "problem"]
+
+
+def _flush(results, kind, runtime_dir, log):
+    """Merge finished runtimes into runtime/<kind>/<Det>.csv and failures into
+    _run_log.csv (one row per kind, series and detector: a rerun replaces it)."""
+    ok = [r for r in results if r[2] is not None]
+    bad = [r for r in results if r[2] is None]
+    new = pd.DataFrame([{"File Name": f, "Model Name": d, "Time Cost": t, "Length": n}
+                        for f, d, t, n in ok])
     for det, part in new.groupby("Model Name") if len(new) else []:
         path = runtime_dir / f"{det}.csv"
         if path.exists():
@@ -107,12 +128,11 @@ def run(benchmark, kind, detectors, datasets=None, workers=14):
             part = pd.concat([old[~old["File Name"].isin(part["File Name"])], part])
         part.sort_values("File Name").to_csv(path, index=False)
 
-    log = parser.path / "_run_log.csv"
-    pd.DataFrame([{"kind": kind, "file_name": f, "detector": d, "problem": msg} for f, d, _, msg in bad],
-                 columns=["kind", "file_name", "detector", "problem"]).to_csv(
-        log, mode="a", header=not log.exists(), index=False)
-    print(f"{benchmark}/{kind}: {len(ok)} scored, {len(bad)} failed or skipped "
-          f"({len(meta)} series x {len(detectors)} detectors; failures in _run_log.csv)")
+    fails = pd.DataFrame([{"kind": kind, "file_name": f, "detector": d, "problem": msg}
+                          for f, d, _, msg in bad], columns=LOG_COLUMNS)
+    if log.exists():
+        fails = pd.concat([pd.read_csv(log), fails], ignore_index=True)
+    fails.drop_duplicates(["kind", "file_name", "detector"], keep="last").to_csv(log, index=False)
 
 
 if __name__ == "__main__":
