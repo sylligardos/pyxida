@@ -1,7 +1,16 @@
 # data/
 
-Benchmark data for TSB-AD. The large files are gitignored; only `splits/` and
-the directory skeleton are tracked.
+Benchmark data for TSB-AD. The data itself lives in the benchmarks root
+(`$TSAD_BENCHMARKS`, default `~/Documents/tsad-benchmarks/tsb-ad/`), next to the
+other benchmarks in the same format; see the README there for the format. Here,
+`raw/`, `scores/`, `metrics/` and `runtime/` are local links into that folder
+(gitignored), and only `splits/` is tracked.
+
+To set up the links on a new machine:
+
+```bash
+for d in raw scores metrics runtime; do ln -s ~/Documents/tsad-benchmarks/tsb-ad/$d data/$d; done
+```
 
 ## Expected structure
 
@@ -19,7 +28,7 @@ data/
 ├── runtime/
 │   ├── uni/    ← one CSV per detector with wall-clock runtimes
 │   └── multi/
-└── splits/     ← official TSB-AD-U/M Eval and Label split CSVs (tracked)
+└── splits/     ← official TSB-AD splits, {U,M}-{Eval,Label}.csv (tracked)
 ```
 
 ## Download
@@ -33,11 +42,14 @@ Download the data from the official repository and place the files in the
 subdirectories above, preserving this layout. The parser will find everything
 automatically once the structure matches.
 
-## Custom data path
+## Other benchmarks and custom paths
 
-If you store the data elsewhere, pass the path explicitly:
+Any benchmark in the common format under the benchmarks root loads by name, and
+any folder in the format loads by path:
 
 ```python
 from tsbadparser import TSBADParser
-parser = TSBADParser("/path/to/your/data", kind="uni")
+TSBADParser.list_benchmarks()                      # ['tab', 'timeeval', 'tsb-ad', 'tsb-uad']
+parser = TSBADParser(benchmark="tab", kind="multi")
+parser = TSBADParser("/path/to/a/benchmark", kind="uni")
 ```

@@ -358,3 +358,23 @@ def test_visualize_multivariate(parser_multi):
         anomaly_labels=labels[0],
         title=fnames[0],
     )
+
+
+# ---------------------------------------------------------------------------
+# Other benchmarks in the common format
+# ---------------------------------------------------------------------------
+
+def test_default_is_tsb_ad():
+    assert TSBADParser(kind="uni").benchmark == "tsb-ad"
+
+
+@pytest.mark.parametrize("benchmark", [b for b in TSBADParser.list_benchmarks() if b != "tsb-ad"])
+def test_other_benchmarks_load(benchmark):
+    """Every converted benchmark parses, has splits, and its scores are classified."""
+    for kind in ("uni", "multi"):
+        parser = TSBADParser(benchmark=benchmark, kind=kind)
+        assert parser.benchmark == benchmark
+        splits = parser.load_splits()
+        assert set(splits["eval"]) <= set(parser.meta.filename)
+        assert not set(parser.get_detectors()) & set(parser.get_ensembles())
+        print(f"\n{benchmark}/{kind}: {len(parser.meta)} series, {len(parser.get_detectors())} detectors")

@@ -2,7 +2,14 @@
 @who: Emmanouil Sylligardos (Sylli)
 @where: Paris
 @when: 2026 (3rd year PhD)
-@what: TSB-AD parser
+@what: Parser for TSAD benchmarks in the common (TSB-AD) format.
+
+TSB-AD is the default. Any other benchmark converted into the same format (see
+README.md at the benchmarks root, and src/convert/) is read the same way:
+
+    TSBADParser(benchmark="tab", kind="multi")
+
+The benchmarks root is $TSAD_BENCHMARKS, or ~/Documents/tsad-benchmarks.
 """
 
 import os
@@ -19,22 +26,26 @@ from tqdm import tqdm
 
 
 class TSBADParser:
-    """Parser for the TSB-AD benchmark dataset.
+    """Parser for a TSAD benchmark in the common (TSB-AD) format.
 
     Provides access to raw time series, anomaly scores, evaluation metrics,
     runtimes, and train/eval splits for both univariate ('uni') and
-    multivariate ('multi') variants of the benchmark.
+    multivariate ('multi') series of one benchmark.
 
     Args:
-        path: Root directory of the benchmark data (the folder that contains
-              raw/, scores/, metrics/, runtime/, and splits/). Defaults to
-              the data/ directory next to this repo (TSB-AD/data/).
+        path: Folder of one benchmark (the folder that contains raw/,
+              scores/, metrics/, runtime/, and splits/). Takes precedence
+              over `benchmark`.
         kind: Either 'uni' (univariate) or 'multi' (multivariate).
+        benchmark: Name of a benchmark under the benchmarks root, e.g.
+              'tsb-ad', 'tsb-uad', 'tab', 'timeeval'. Used when `path` is
+              None. Defaults to 'tsb-ad', which falls back to the repo's
+              data/ folder if the root does not have it.
     """
 
     VALID_KINDS = {"uni", "multi"}
     PATTERN = re.compile(
-        r"(?P<series_id>\d+)_(?P<dataset>\w+)_id_(?P<id_in_dataset>\d+)_(?P<entity>\w+)_tr_(?P<train>\d+)_1st_(?P<first>\d+)"
+        r"(?P<series_id>\d+)_(?P<dataset>[\w-]+)_id_(?P<id_in_dataset>\d+)_(?P<entity>[\w-]+)_tr_(?P<train>\d+)_1st_(?P<first>\d+)"
     )
     BASELINES = ["Oracle", "RandomMS"]
     # Known ensemble methods. Any scores/<kind>/ subdirectory not in DETECTORS
@@ -57,12 +68,30 @@ class TSBADParser:
         "TranAD", "USAD",
     ]
 
-    # Default data root: repo_root/data/ (this file lives at src/tsbadparser/parser.py)
+    # Repo's own data/ folder (this file lives at src/tsbadparser/parser.py);
+    # TSB-AD's fallback location.
     _DEFAULT_DATA_PATH = Path(__file__).parent.parent.parent / "data"
+    DEFAULT_BENCHMARK = "tsb-ad"
 
-    def __init__(self, path: str | Path | None = None, kind: str = "uni"):
+    @staticmethod
+    def benchmarks_root() -> Path:
+        """Folder holding one sub-folder per benchmark."""
+        return Path(os.environ.get("TSAD_BENCHMARKS", Path.home() / "Documents" / "tsad-benchmarks"))
+
+    @classmethod
+    def list_benchmarks(cls) -> list[str]:
+        """Benchmarks available under the root: every folder with a raw/."""
+        root = cls.benchmarks_root()
+        if not root.exists():
+            return []
+        return sorted(p.name for p in root.iterdir() if (p / "raw").is_dir())
+
+    def __init__(self, path: str | Path | None = None, kind: str = "uni", benchmark: str | None = None):
         if path is None:
-            path = self._DEFAULT_DATA_PATH
+            benchmark = benchmark or self.DEFAULT_BENCHMARK
+            path = self.benchmarks_root() / benchmark
+            if not path.exists() and benchmark == self.DEFAULT_BENCHMARK:
+                path = self._DEFAULT_DATA_PATH
         self.path = Path(path)
 
         if not self.path.exists():
@@ -74,6 +103,9 @@ class TSBADParser:
         if kind not in self.VALID_KINDS:
             raise ValueError(f"Unknown kind {kind!r}. Expected one of {self.VALID_KINDS}")
         self.kind = kind
+        # Named after where raw/ really lives, so a folder of links to a
+        # benchmark (like the repo's data/) is recognised as that benchmark.
+        self.benchmark = (self.path / "raw").resolve().parent.name
 
         self.raw_path = self.path / "raw" / self.kind
         self.runtime_path = self.path / "runtime" / self.kind
@@ -89,6 +121,8 @@ class TSBADParser:
         Returns:
             List of filenames (not full paths) found in raw/<kind>/.
         """
+        if not self.raw_path.exists():
+            return []
         return [f for f in os.listdir(self.raw_path) if f.endswith(".csv")]
 
     def get_datasets(self, sort: bool = True) -> list[str]:
@@ -140,7 +174,9 @@ class TSBADParser:
                 }
             )
 
-        return pd.DataFrame(rows).sort_values("series_id").set_index("series_id")
+        columns = ["series_id", "dataset", "id_in_dataset", "entity_type",
+                   "train_length", "first_anomaly", "filename"]
+        return pd.DataFrame(rows, columns=columns).sort_values("series_id").set_index("series_id")
 
     def load_timeseries(
         self,
@@ -299,13 +335,27 @@ class TSBADParser:
         plt.tight_layout()
         plt.show()
 
+    def _score_dirs(self) -> set[str]:
+        if not self.scores_path.exists():
+            return set()
+        return {p.name for p in self.scores_path.iterdir() if p.is_dir()}
+
+    def is_tsb_ad(self) -> bool:
+        return self.benchmark == self.DEFAULT_BENCHMARK
+
     def get_detectors(self) -> list[str]:
         """Return the sorted list of original anomaly detectors for this kind.
 
+        TSB-AD's detectors are the known list. Any other benchmark's are its
+        score folders, minus the known ensembles and baselines.
+
         Returns:
-            Sorted list of detector name strings.
+            Sorted list of detector name strings (empty if there are no scores).
         """
-        detectors = self.DETECTORS_MULTI if self.kind == "multi" else self.DETECTORS
+        if self.is_tsb_ad():
+            detectors = self.DETECTORS_MULTI if self.kind == "multi" else self.DETECTORS
+        else:
+            detectors = self._score_dirs() - set(self.ENSEMBLES) - set(self.BASELINES)
         return sorted(detectors)
 
     def get_baselines(self) -> list[str]:
@@ -326,12 +376,10 @@ class TSBADParser:
             Sorted list of ensemble name strings.
         """
         known = set(self.get_detectors()) | set(self.BASELINES)
-        discovered = []
-        if self.scores_path.exists():
-            for name in os.listdir(self.scores_path):
-                if (self.scores_path / name).is_dir() and name not in known:
-                    discovered.append(name)
-        return sorted(set(self.ENSEMBLES) | set(discovered))
+        discovered = self._score_dirs() - known
+        if not self.is_tsb_ad():
+            return sorted(discovered)
+        return sorted(set(self.ENSEMBLES) | discovered)
 
     def get_all_models(self) -> list[str]:
         """Return all known models: detectors + ensembles + baselines.
@@ -460,7 +508,7 @@ class TSBADParser:
             Dict with keys 'eval' and 'label', each containing a list of
             filename strings belonging to that split.
         """
-        prefix = "TSB-AD-" + ("U" if self.kind == "uni" else "M")
+        prefix = "U" if self.kind == "uni" else "M"
         splits = {
             "eval": list(pd.read_csv(self.splits_path / f"{prefix}-Eval.csv")["file_name"]),
             "label": list(pd.read_csv(self.splits_path / f"{prefix}-Label.csv")["file_name"]),

@@ -15,16 +15,13 @@ env/
 *.ipynb
 
 # ── Benchmark data (too large for git) ───────────────────────────────────────
-# Keep data/splits/ (small CSVs) and directory skeletons (.gitkeep files).
-data/raw/uni/*
-data/raw/multi/*
-data/scores/uni/*
-data/scores/multi/*
-data/metrics/uni/*
-data/metrics/multi/*
-data/runtime/uni/*
-data/runtime/multi/*
-!**/.gitkeep
+# The data lives in the benchmarks root ($TSAD_BENCHMARKS, default
+# ~/Documents/tsad-benchmarks); these are local links into its tsb-ad/ folder.
+# Only data/splits/ (small CSVs) is tracked.
+data/raw
+data/scores
+data/metrics
+data/runtime
 
 # ── Test / cache ──────────────────────────────────────────────────────────────
 .pytest_cache/

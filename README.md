@@ -34,7 +34,7 @@ tsb-ad-parser/
 │   ├── scores/uni|multi/                 # Per-detector .npy score files                 [gitignored]
 │   ├── metrics/uni|multi/                # Per-detector metric CSVs                      [gitignored]
 │   ├── runtime/uni|multi/                # Per-detector runtime CSVs                     [gitignored]
-│   ├── splits/                           # Official TSB-AD-U / TSB-AD-M split CSVs
+│   ├── splits/                           # Official TSB-AD splits: {U,M}-{Eval,Label}.csv
 │   ├── anomaly_features_uni.parquet      # Precomputed anomaly features (uni)            [gitignored]
 │   └── anomaly_features_multi.parquet    # Precomputed anomaly features (multi)          [gitignored]
 ├── src/
@@ -54,7 +54,7 @@ tsb-ad-parser/
 └── pyproject.toml                        # Makes tsbadparser pip-installable
 ```
 
-The bulk of the data (raw/, scores/, metrics/, runtime/) is gitignored because of its size. Only the split CSVs are tracked.
+The bulk of the data (raw/, scores/, metrics/, runtime/) lives outside the repo, in the benchmarks root (`$TSAD_BENCHMARKS`, default `~/Documents/tsad-benchmarks`), and `data/` links to its `tsb-ad/` folder. Only the split CSVs are tracked. Other benchmarks converted to the same format (TSB-UAD, TAB, TimeEval; converters in `src/convert/`) load by name: `TSBADParser(benchmark="tab", kind="uni")`. See `data/README.md`.
 
 ## Setup
 
