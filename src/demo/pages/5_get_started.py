@@ -17,9 +17,11 @@ from lib import (
     REPO_PARSER,
     REPO_TEMPLATE,
     benchmark_label,
+    KIND_LABELS,
     current_benchmark,
+    current_kind,
     get_parser,
-    is_tsb_ad,
+    has_combos,
     page_header,
     ranked,
     set_scores,
@@ -28,7 +30,7 @@ from lib import (
     vus_buffer_selector,
 )
 
-KIND = "uni"
+KIND = current_kind()
 MIN_COVERAGE = 0.5
 
 page_header("🚀 Get started", "How do I begin, right now?")
@@ -70,11 +72,12 @@ st.divider()
 
 st.subheader("What to run on your data")
 
-if not is_tsb_ad():
+if not has_combos(KIND):
     st.info(
         f"The recommendation comes from the exhaustive search over pairs of "
-        f"detectors, run on TSB-AD only. Switch the benchmark to TSB-AD to see "
-        f"it. (Current: {benchmark_label(current_benchmark())}.)"
+        f"detectors, run on TSB-AD univariate only. Switch the sidebar to "
+        f"TSB-AD, univariate, to see it. "
+        f"(Current: {benchmark_label(current_benchmark())}, {KIND_LABELS[KIND]}.)"
     )
     st.stop()
 

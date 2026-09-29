@@ -7,8 +7,8 @@ least two benchmarks are compared -- the same name means the same TSB-AD
 implementation and hyperparameters, except where a benchmark shipped its own
 scores (TSB-UAD).
 
-This page ignores the sidebar's benchmark choice: it is the one page about all
-of them at once.
+This page ignores the sidebar's benchmark choice -- it is the one page about
+all of them at once -- but follows its univariate / multivariate switch.
 """
 
 import sys
@@ -28,7 +28,9 @@ from lib import (
     TSBADParser,
     _metrics,
     _parser,
+    KIND_LABELS,
     benchmark_label,
+    current_kind,
     page_header,
     takeaway,
 )
@@ -42,9 +44,10 @@ available = TSBADParser.list_benchmarks()
 ordered = [b for b in BENCHMARK_LABELS if b in available] + \
           [b for b in available if b not in BENCHMARK_LABELS]
 
+kind = current_kind()
+st.caption(f"Comparing {KIND_LABELS[kind]} series: switch in the sidebar. "
+           "The benchmark choice above does not apply here.")
 with st.sidebar:
-    kind = st.radio("Series", ["uni", "multi"], horizontal=True, key="xb_kind",
-                    format_func=lambda k: "univariate" if k == "uni" else "multivariate")
     buffer = st.select_slider("VUS buffer (L)", options=TSBAD_VUS_BUFFERS, value=128,
                               key="xb_buffer")
     chosen = st.multiselect("Benchmarks", ordered, default=ordered,

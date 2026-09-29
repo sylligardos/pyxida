@@ -95,12 +95,42 @@ _PER_BENCHMARK_STATE = [
 ]
 
 
+KIND_KEY = "demo_kind"
+KIND_LABELS = {"uni": "univariate", "multi": "multivariate"}
+
+
 def benchmark_label(name: str) -> str:
     return BENCHMARK_LABELS.get(name, name)
 
 
+def current_kind() -> str:
+    return st.session_state.get(KIND_KEY, "uni")
+
+
+def has_combos(kind: str) -> bool:
+    """Is there an exhaustive combination search for this benchmark and kind?
+    Only TSB-AD univariate, today."""
+    return is_tsb_ad() and bool(combo_datasets(kind))
+
+
+def scored_series(kind: str) -> set:
+    return _scored_series(current_benchmark(), kind)
+
+
+@st.cache_data
+def _scored_series(benchmark: str, kind: str) -> set:
+    """Series with at least one detector score."""
+    parser = _parser(benchmark, kind)
+    stems = set()
+    for detector in parser.get_detectors():
+        folder = parser.scores_path / detector
+        if folder.is_dir():
+            stems |= {p.stem for p in folder.glob("*.npy")}
+    return {f for f in parser.meta.filename if f[:-4] in stems}
+
+
 def benchmark_selector() -> str:
-    """The sidebar control every page shares: which benchmark is on screen."""
+    """The sidebar controls every page shares: which benchmark, which kind."""
     available = TSBADParser.list_benchmarks() or [DEFAULT_BENCHMARK]
     options = ([b for b in BENCHMARK_LABELS if b in available]
                + [b for b in available if b not in BENCHMARK_LABELS])
@@ -114,12 +144,16 @@ def benchmark_selector() -> str:
         chosen = st.radio("Benchmark", options, key=BENCHMARK_KEY,
                           format_func=benchmark_label)
         st.caption(BENCHMARK_NOTES.get(chosen, ""))
+        st.session_state.setdefault(KIND_KEY, "uni")
+        kind = st.radio("Series", list(KIND_LABELS), key=KIND_KEY, horizontal=True,
+                        format_func=KIND_LABELS.get)
         st.divider()
 
-    if st.session_state.get("_last_benchmark") not in (None, chosen):
+    where = (chosen, kind)
+    if st.session_state.get("_last_view") not in (None, where):
         for key in _PER_BENCHMARK_STATE:
             st.session_state.pop(key, None)
-    st.session_state["_last_benchmark"] = chosen
+    st.session_state["_last_view"] = where
     return chosen
 
 
@@ -127,6 +161,8 @@ def demo_series(kind: str = "uni") -> str:
     """Default series for the current benchmark: the Start page's NAB series on
     TSB-AD, otherwise the shortest series of NAB (or of the first dataset)."""
     meta = get_parser(kind).meta
+    if meta.empty:
+        return None
     if is_tsb_ad() and DEMO_SERIES in set(meta.filename):
         return DEMO_SERIES
     lengths = benchmark_summary(kind).get("lengths", {})
@@ -228,10 +264,11 @@ def _benchmark_summary(benchmark: str, kind: str = "uni") -> dict:
 def solo_scores(kind: str, buffer: int):
     """Every detector's VUS on every series, with its rank on that series.
 
-    TSB-AD reads the k=1 rows of the combination search; every other benchmark
-    reads its metric files, which hold the same number at ten buffers.
+    Where the combination search exists (TSB-AD univariate) it reads its k=1
+    rows; everywhere else the metric files, which hold the same number at ten
+    buffers.
     """
-    if is_tsb_ad():
+    if has_combos(kind):
         return _solo_scores_combos(kind, buffer)
     return _solo_scores_metrics(current_benchmark(), kind, buffer)
 
@@ -283,7 +320,7 @@ def _solo_scores_combos(kind: str, buffer: int):
 
 def set_scores(kind: str, buffer: int, k: int):
     """Every k-set's VUS on every series. TSB-AD only; empty elsewhere."""
-    if not is_tsb_ad():
+    if not has_combos(kind):
         import pandas as pd
         return pd.DataFrame()
     return _set_scores(kind, buffer, k)

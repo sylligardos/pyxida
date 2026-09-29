@@ -629,13 +629,17 @@ def _sticky(state_key: str, default, widget):
     return value
 
 
-def vus_buffer_selector(label: str = 'VUS buffer (L)') -> int:
+def vus_buffer_selector(label: str = 'VUS buffer (L)',
+                        continuous: bool | None = None) -> int:
     """Sidebar control for which VUS buffer every number on the page is read at.
 
-    TSB-AD's combination tables hold all 257 buffers; every other benchmark
-    only has the ten its metric files report, so there the slider snaps.
+    TSB-AD's combination tables hold all 257 buffers; metric files only have
+    ten, so without the tables the slider snaps. `continuous` says whether the
+    page reads the tables (default: whenever the benchmark is TSB-AD).
     """
-    if not is_tsb_ad():
+    if continuous is None:
+        continuous = is_tsb_ad()
+    if not continuous:
         return _sticky('combo_buffer', DEFAULT_VUS_BUFFER, lambda current: (
             st.sidebar.select_slider(
                 label, options=TSBAD_VUS_BUFFERS,

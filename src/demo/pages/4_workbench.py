@@ -30,8 +30,11 @@ from lib import (
     combined_score,
     combo_datasets,
     current_benchmark,
+    current_kind,
     demo_series,
     get_parser,
+    has_combos,
+    scored_series,
     load_notes,
     page_header,
     plot_series_plotly,
@@ -40,8 +43,11 @@ from lib import (
     vus_buffer_selector,
 )
 
-KIND = "uni"
+KIND = current_kind()
 DEFAULT_N_DETECTORS = 3
+# A multivariate series can have 100+ channels; one plot row each is unreadable.
+DEFAULT_CHANNELS = 3
+MAX_CHANNELS = 8
 MAX_DETECTORS = 6
 # Above this the browser is drawing more points than it has pixels, and the
 # sample button should not hand someone a page that takes ten seconds.
@@ -59,6 +65,21 @@ meta = parser.meta.reset_index()
 BENCH = current_benchmark()
 DEMO_SERIES = demo_series(KIND)
 
+# Benchmarks scored only on examples have many series with no detector at all.
+# Listing them by default lands the reader on empty plots.
+scored = scored_series(KIND)
+if 0 < len(scored) < len(meta):
+    with st.sidebar:
+        only_scored = st.checkbox(
+            "Only series with scores", value=True, key="wb_only_scored",
+            help=f"{len(scored):,} of {len(meta):,} series in this benchmark have "
+                 "detector scores. Untick to browse the rest (series and labels only).")
+    if only_scored:
+        meta = meta[meta.filename.isin(scored)]
+if meta.empty:
+    st.info("This benchmark has no series of this kind.")
+    st.stop()
+
 
 # ---------------------------------------------------------------------------
 # Data
@@ -68,6 +89,13 @@ DEMO_SERIES = demo_series(KIND)
 def load_series(bench: str, kind: str, filename: str):
     names, series, labels = get_parser(kind).load_timeseries(filename=[filename])
     return series[0], labels[0]
+
+
+@st.cache_data
+def channel_labels(bench: str, kind: str, filename: str, n: int) -> list:
+    """Channel names from the CSV header (all columns but Label)."""
+    header = pd.read_csv(get_parser(kind).raw_path / filename, nrows=0).columns[:-1]
+    return [str(c) for c in header][:n] if len(header) >= n else [f"C{i}" for i in range(n)]
 
 
 @st.cache_data
@@ -145,7 +173,7 @@ def combo_vus(bench: str, kind: str, dataset: str, buffer: int, filename: str,
 # Which series
 # ---------------------------------------------------------------------------
 
-buffer = vus_buffer_selector()
+buffer = vus_buffer_selector(continuous=has_combos(KIND))
 
 arrived = st.session_state.pop(WORKBENCH_KEY, None)
 arrival_pins = st.session_state.pop(WORKBENCH_PINS_KEY, None)
@@ -173,9 +201,11 @@ datasets = sorted(meta.dataset.unique())
 # whatever sorts first -- that is CATSv2, 300k points, and a slow first
 # impression is the one thing a demo cannot afford.
 default_row = meta[meta.filename == DEMO_SERIES]
+if not len(default_row) and len(meta):
+    default_row = meta.head(1)
 if len(default_row):
     st.session_state.setdefault("wb_dataset", default_row.iloc[0].dataset)
-    st.session_state.setdefault("wb_series", DEMO_SERIES)
+    st.session_state.setdefault("wb_series", default_row.iloc[0].filename)
 st.session_state.setdefault("wb_dataset", datasets[0])
 
 
@@ -373,18 +403,33 @@ if not traces:
         "**Also show** in the sidebar."
     )
 
+plotted = series
+if series.ndim == 2 and series.shape[1] > 1:
+    channel_names = channel_labels(BENCH, KIND, filename, series.shape[1])
+    key = "wb_channels"
+    if any(c >= series.shape[1] for c in st.session_state.get(key, [])):
+        st.session_state.pop(key)
+    channels = st.multiselect(
+        f"Channels ({series.shape[1]} in this series)", list(range(series.shape[1])),
+        default=list(range(min(DEFAULT_CHANNELS, series.shape[1]))),
+        max_selections=MAX_CHANNELS, key=key, format_func=lambda c: channel_names[c],
+        help="One plot row per channel. Detector scores are for the whole "
+             "multivariate series, whichever channels are drawn.")
+    plotted = series[:, channels] if channels else series[:, :1]
+
 figure = plot_series_plotly(
-    series, labels,
+    plotted, labels,
     title=filename,
     detector_scores=traces or None,
     detector_names=names or None,
     highlight=(int(starts[picked]), int(ends[picked])) if picked is not None else None,
 )
-figure.update_layout(height=max(400, 150 * (len(traces) + 1)))
+n_channel_rows = plotted.shape[1] if plotted.ndim == 2 else 1
+figure.update_layout(height=max(400, 150 * (len(traces) + n_channel_rows)))
 st.plotly_chart(figure, width='stretch')
 st.caption(
-    "Top row is the series, anomalies in red. Below it one row per detector, "
-    "scores as the detector emitted them."
+    "Top row(s): the series, one per channel drawn, anomalies in red. Below, one "
+    "row per detector, scores as the detector emitted them."
 )
 
 # ---------------------------------------------------------------------------
@@ -392,13 +437,16 @@ st.caption(
 # ---------------------------------------------------------------------------
 
 notes = load_notes()
-existing = notes.get(filename, {})
+# TSB-AD notes keep the bare file name they were saved under; elsewhere the key
+# says which benchmark and kind, since file names repeat across benchmarks.
+note_key = filename if BENCH == "tsb-ad" else f"{BENCH}:{KIND}:{filename}"
+existing = notes.get(note_key, {})
 
 with st.expander(f"📝 Notes{' (saved)' if existing else ''}", expanded=bool(existing)):
     text = st.text_area(
         "What did you see?",
         value=existing.get("note", ""),
-        key=f"note_{filename}",
+        key=f"note_{note_key}",
         height=120,
         label_visibility="collapsed",
         placeholder="e.g. MatrixProfile fires 12 points before the anomaly, "
@@ -406,7 +454,7 @@ with st.expander(f"📝 Notes{' (saved)' if existing else ''}", expanded=bool(ex
     )
     left, right = st.columns([1, 4])
     if left.button("Save note", width='stretch'):
-        save_note(filename, text)
+        save_note(note_key, text)
         st.rerun()
     if existing:
         right.caption(f"Last saved {existing['updated']}")

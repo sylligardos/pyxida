@@ -21,7 +21,9 @@ from lib import (
     BENCHMARK_NOTES,
     benchmark_label,
     benchmark_summary,
+    KIND_LABELS,
     current_benchmark,
+    current_kind,
     demo_series,
     get_parser,
     paper_author,
@@ -29,15 +31,20 @@ from lib import (
     takeaway,
 )
 
-KIND = "uni"
+KIND = current_kind()
 BENCHMARK = current_benchmark()
 DEMO_SERIES = demo_series(KIND)
+if DEMO_SERIES is None:
+    st.title(f"🧭 {TITLE}")
+    st.info(f"{benchmark_label(BENCHMARK)} has no {KIND_LABELS[KIND]} series. "
+            "Switch the Series control in the sidebar.")
+    st.stop()
 
 # What the demo shows below the snippet is what the snippet produces. Kept as a
 # string so the two cannot drift into a lie: the page runs these exact calls.
 SNIPPET = f'''from tsbadparser import TSBADParser
 
-parser = TSBADParser(benchmark="{BENCHMARK}", kind="uni")
+parser = TSBADParser(benchmark="{BENCHMARK}", kind="{KIND}")
 names, series, labels = parser.load_timeseries(
     filename=["{DEMO_SERIES}"])
 parser.visualize_timeseries(series[0], anomaly_labels=labels[0], title=names[0])'''
@@ -66,7 +73,7 @@ st.divider()
 # --- The benchmark at a glance -------------------------------------------
 summary = benchmark_summary(KIND)
 
-st.subheader(f"{benchmark_label(BENCHMARK)}, univariate")
+st.subheader(f"{benchmark_label(BENCHMARK)}, {KIND_LABELS[KIND]}")
 columns = st.columns(5)
 columns[0].metric("Series", f"{summary['n_series']:,}")
 columns[1].metric("Datasets", summary["n_datasets"])
@@ -76,7 +83,7 @@ else:
     columns[2].metric("Scored series", f"{summary.get('n_scored_series', 0):,}")
 columns[3].metric("Detectors", summary["n_detectors"])
 columns[4].metric("Points", f"{summary.get('n_points', 0) / 1e6:.1f}M")
-if BENCHMARK == "tsb-ad":
+if BENCHMARK == "tsb-ad" and KIND == "uni":
     st.caption(
         f"Every detector scored every series: "
         f"{summary['n_detectors'] * summary['n_series']:,} score files, "
@@ -87,6 +94,9 @@ else:
     st.caption(
         f"{BENCHMARK_NOTES.get(BENCHMARK, '')} Same format as TSB-AD, so every "
         "page reads it the same way. Counts are read from the data, not typed in."
+        if BENCHMARK != "tsb-ad" else
+        f"Every detector scored every series, from [TSB-AD]({REPO_DATA}). "
+        "Counts are read from the data, not typed in."
     )
 
 st.divider()

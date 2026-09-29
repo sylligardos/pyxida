@@ -1,6 +1,13 @@
 """Shared pytest fixtures for TSBADParser tests."""
 
 from pathlib import Path
+
+# Non-interactive backend before anything imports pyplot: the visualize tests
+# call plt.show(), which otherwise opens a window per test and blocks the run
+# until someone closes it.
+import matplotlib
+matplotlib.use("Agg")
+
 import pytest
 from tsbadparser import TSBADParser
 

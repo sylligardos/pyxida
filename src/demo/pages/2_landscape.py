@@ -23,7 +23,9 @@ from lib import (
     benchmark_summary,
     chart_selection,
     current_benchmark,
+    current_kind,
     get_parser,
+    has_combos,
     goto_workbench,
     page_header,
     solo_scores,
@@ -32,7 +34,7 @@ from lib import (
     vus_buffer_selector,
 )
 
-KIND = "uni"
+KIND = current_kind()
 TABLE_ROWS = 15
 SCOPE_KEY = "ls_scope"
 
@@ -77,7 +79,7 @@ def landscape(benchmark: str, kind: str, buffer: int) -> pd.DataFrame:
             ))
 
 
-buffer = vus_buffer_selector()
+buffer = vus_buffer_selector(continuous=has_combos(KIND))
 table = landscape(current_benchmark(), KIND, buffer)
 
 if table.empty:

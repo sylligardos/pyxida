@@ -21,8 +21,10 @@ import streamlit as st
 from lib import (
     MIN_COVERAGE,
     benchmark_label,
+    KIND_LABELS,
     current_benchmark,
-    is_tsb_ad,
+    current_kind,
+    has_combos,
     cached_combo_detectors,
     cached_combos,
     cached_heuristics,
@@ -40,7 +42,7 @@ from lib import (
     vus_buffer_selector,
 )
 
-KIND = "uni"
+KIND = current_kind()
 SHORTLIST = 5          # how many detectors a person would plausibly try
 TABLE_ROWS = 15
 
@@ -123,12 +125,12 @@ def shortlist_agreement(kind: str, buffer: int, threshold: float,
 # Controls
 # ---------------------------------------------------------------------------
 
-if not is_tsb_ad():
+if not has_combos(KIND):
     st.info(
         f"Redundancy is read from the exhaustive search over every pair and "
-        f"triplet of detectors, which has been run on TSB-AD only. Switch the "
-        f"benchmark to TSB-AD in the sidebar to see it. "
-        f"(Current: {benchmark_label(current_benchmark())}.)"
+        f"triplet of detectors, which has been run on TSB-AD univariate only. "
+        f"Switch the sidebar to TSB-AD, univariate, to see it. "
+        f"(Current: {benchmark_label(current_benchmark())}, {KIND_LABELS[KIND]}.)"
     )
     st.stop()
 
