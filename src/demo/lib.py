@@ -21,7 +21,15 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 import streamlit as st  # noqa: E402
 
 from app.utils import (  # noqa: E402,F401  (re-exported for the pages)
+    BENCHMARK_KEY,
+    DEFAULT_BENCHMARK,
     DEFAULT_VUS_BUFFER,
+    TSBAD_VUS_BUFFERS,
+    TSBADParser,
+    _metrics,
+    _parser,
+    current_benchmark,
+    is_tsb_ad,
     cached_combo_detectors,
     cached_combos,
     cached_metrics,
@@ -55,6 +63,76 @@ REPO_DATA = "https://github.com/thedatumorg/TSB-AD"
 # The series the Start page loads. Small enough to draw instantly, three
 # anomalies of visibly different shape.
 DEMO_SERIES = "001_NAB_id_1_Facility_tr_1007_1st_2014.csv"
+
+
+# ---------------------------------------------------------------------------
+# Benchmarks
+# ---------------------------------------------------------------------------
+
+# Display order and names. TSB-AD is complete; the others are shown with what
+# has been computed for them (see README.md in the benchmarks root).
+BENCHMARK_LABELS = {
+    "tsb-ad": "TSB-AD",
+    "tsb-uad": "TSB-UAD",
+    "timeeval": "TimeEval",
+    "tab": "TAB",
+}
+BENCHMARK_NOTES = {
+    "tsb-ad": "Complete: every detector on every series, plus the exhaustive "
+              "combination search.",
+    "tsb-uad": "12 detectors, with the scores TSB-UAD ships (rounded to two "
+               "decimals).",
+    "timeeval": "Examples only: a few collections, 6 fast detectors. "
+                "TimeEval's TSB-UAD collections are left out.",
+    "tab": "Examples only: a few collections, 6 fast detectors.",
+}
+
+# Page state that points into one benchmark and is meaningless in another.
+# Dropped when the benchmark changes, so no widget is handed a value it lacks.
+_PER_BENCHMARK_STATE = [
+    "wb_dataset", "wb_series", "wb_pins", "wb_anomaly", "wb_combos",
+    "ls_scope", "combo_dataset", "combo_series", "scope_dataset", "scope_type",
+]
+
+
+def benchmark_label(name: str) -> str:
+    return BENCHMARK_LABELS.get(name, name)
+
+
+def benchmark_selector() -> str:
+    """The sidebar control every page shares: which benchmark is on screen."""
+    available = TSBADParser.list_benchmarks() or [DEFAULT_BENCHMARK]
+    options = ([b for b in BENCHMARK_LABELS if b in available]
+               + [b for b in available if b not in BENCHMARK_LABELS])
+    if DEFAULT_BENCHMARK not in options:
+        options.insert(0, DEFAULT_BENCHMARK)
+    st.session_state.setdefault(BENCHMARK_KEY, DEFAULT_BENCHMARK)
+    if st.session_state[BENCHMARK_KEY] not in options:
+        st.session_state[BENCHMARK_KEY] = DEFAULT_BENCHMARK
+
+    with st.sidebar:
+        chosen = st.radio("Benchmark", options, key=BENCHMARK_KEY,
+                          format_func=benchmark_label)
+        st.caption(BENCHMARK_NOTES.get(chosen, ""))
+        st.divider()
+
+    if st.session_state.get("_last_benchmark") not in (None, chosen):
+        for key in _PER_BENCHMARK_STATE:
+            st.session_state.pop(key, None)
+    st.session_state["_last_benchmark"] = chosen
+    return chosen
+
+
+def demo_series(kind: str = "uni") -> str:
+    """Default series for the current benchmark: the Start page's NAB series on
+    TSB-AD, otherwise the shortest series of NAB (or of the first dataset)."""
+    meta = get_parser(kind).meta
+    if is_tsb_ad() and DEMO_SERIES in set(meta.filename):
+        return DEMO_SERIES
+    lengths = benchmark_summary(kind).get("lengths", {})
+    pool = meta[meta.dataset == "NAB"]
+    pool = pool if len(pool) else meta[meta.dataset == meta.dataset.iloc[0]]
+    return min(pool.filename, key=lambda f: lengths.get(f, 10 ** 12))
 
 
 # ---------------------------------------------------------------------------
@@ -100,38 +178,87 @@ def paper_author() -> dict:
 # Headline numbers
 # ---------------------------------------------------------------------------
 
-@st.cache_data
 def benchmark_summary(kind: str = "uni") -> dict:
-    """Size of the benchmark, from build_summary.py.
+    return _benchmark_summary(current_benchmark(), kind)
 
-    Counting anomaly events means reading every label file, which is a minute
-    the demo cannot spend on page load. If the file is missing the counts that
-    are free (series, datasets, detectors) are still returned, so the page
-    degrades to fewer numbers instead of an error.
+
+@st.cache_data
+def _benchmark_summary(benchmark: str, kind: str = "uni") -> dict:
+    """Size of the benchmark.
+
+    TSB-AD's comes from build_summary.py: counting anomaly events means reading
+    every label file, which is a minute the demo cannot spend on page load.
+    Converted benchmarks have series lengths in their _source_map.csv. Anything
+    not available is left out, so the page degrades to fewer numbers instead of
+    an error.
     """
-    if SUMMARY_PATH.exists():
+    if benchmark == DEFAULT_BENCHMARK and SUMMARY_PATH.exists():
         summary = json.loads(SUMMARY_PATH.read_text()).get(kind)
         if summary:
             return summary
 
-    parser = get_parser(kind)
-    detectors = parser.get_detectors()
-    return {
+    parser = _parser(benchmark, kind)
+    meta = parser.meta
+    summary = {
         "kind": kind,
-        "n_series": len(parser.meta),
-        "n_datasets": parser.meta.dataset.nunique(),
-        "n_detectors": len(detectors),
-        "n_entity_types": parser.meta.entity_type.nunique(),
+        "n_series": len(meta),
+        "n_datasets": meta.dataset.nunique(),
+        "n_detectors": len(parser.get_detectors()),
+        "n_entity_types": meta.entity_type.nunique(),
     }
+    source_map = parser.path / "_source_map.csv"
+    if source_map.exists():
+        import pandas as pd
+        lengths = pd.read_csv(source_map, usecols=["file_name", "length"])
+        lengths = lengths[lengths.file_name.isin(set(meta.filename))]
+        summary["lengths"] = dict(zip(lengths.file_name, lengths.length.astype(int)))
+        summary["n_points"] = int(lengths.length.sum())
+    scores = parser.scores_path
+    summary["n_scored_series"] = len({p.stem for d in parser.get_detectors()
+                                      if (scores / d).is_dir()
+                                      for p in (scores / d).glob("*.npy")}
+                                     & {f[:-4] for f in meta.filename})
+    return summary
 
 
 # ---------------------------------------------------------------------------
 # Scores, shared by Redundancy and Get started
 # ---------------------------------------------------------------------------
 
-@st.cache_data(show_spinner="Reading solo scores ...")
 def solo_scores(kind: str, buffer: int):
-    """Every detector's VUS on every series, with its rank on that series."""
+    """Every detector's VUS on every series, with its rank on that series.
+
+    TSB-AD reads the k=1 rows of the combination search; every other benchmark
+    reads its metric files, which hold the same number at ten buffers.
+    """
+    if is_tsb_ad():
+        return _solo_scores_combos(kind, buffer)
+    return _solo_scores_metrics(current_benchmark(), kind, buffer)
+
+
+@st.cache_data(show_spinner="Reading solo scores ...")
+def _solo_scores_metrics(benchmark: str, kind: str, buffer: int):
+    import pandas as pd
+
+    metrics = _metrics(benchmark, kind)
+    column = f"VUS-PR (L: {buffer})"
+    if metrics.empty or column not in metrics.columns:
+        return pd.DataFrame()
+    parser = _parser(benchmark, kind)
+    metrics = metrics[metrics["Model Name"].isin(set(parser.get_detectors()))]
+    datasets = parser.meta.set_index("filename").dataset
+    table = pd.DataFrame({
+        "filename": metrics["File Name"].to_numpy(),
+        "dataset": metrics["File Name"].map(datasets).to_numpy(),
+        "detector": metrics["Model Name"].to_numpy(),
+        "vus": metrics[column].to_numpy(),
+    }).dropna(subset=["vus"])
+    table["rank"] = table.groupby("filename").vus.rank(ascending=False, method="first")
+    return table
+
+
+@st.cache_data(show_spinner="Reading solo scores ...")
+def _solo_scores_combos(kind: str, buffer: int):
     import pandas as pd
 
     roster = cached_combo_detectors(kind)
@@ -154,9 +281,16 @@ def solo_scores(kind: str, buffer: int):
     return table
 
 
-@st.cache_data(show_spinner="Reading combinations ...")
 def set_scores(kind: str, buffer: int, k: int):
-    """Every k-set's VUS on every series."""
+    """Every k-set's VUS on every series. TSB-AD only; empty elsewhere."""
+    if not is_tsb_ad():
+        import pandas as pd
+        return pd.DataFrame()
+    return _set_scores(kind, buffer, k)
+
+
+@st.cache_data(show_spinner="Reading combinations ...")
+def _set_scores(kind: str, buffer: int, k: int):
     import pandas as pd
 
     roster = cached_combo_detectors(kind)

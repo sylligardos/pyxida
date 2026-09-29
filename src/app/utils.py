@@ -40,22 +40,75 @@ def get_kind() -> str:
     return st.sidebar.selectbox("Kind", ["uni", "multi"], key="kind_selector")
 
 
+# ---------------------------------------------------------------------------
+# Which benchmark
+# ---------------------------------------------------------------------------
+# The demo can show any benchmark in the common format. The choice lives in
+# st.session_state[BENCHMARK_KEY] (set by the demo's sidebar); without it,
+# everything is TSB-AD, which keeps the exploratory app unchanged.
+#
+# Every cached loader takes the benchmark as an argument. Reading the session
+# inside a cached function would freeze the first benchmark into the cache.
+
+BENCHMARK_KEY = 'benchmark'
+DEFAULT_BENCHMARK = 'tsb-ad'
+
+# Collections a benchmark ships that the demo leaves out. TimeEval's download
+# includes 12k TSB-UAD series that are not in TimeEval's own index or paper,
+# and they would be 93% of "TimeEval".
+HIDDEN_DATASETS = {
+    'timeeval': {'TSB-UAD-artificial', 'TSB-UAD-synthetic'},
+}
+
+
+def current_benchmark() -> str:
+    return st.session_state.get(BENCHMARK_KEY, DEFAULT_BENCHMARK)
+
+
+def is_tsb_ad() -> bool:
+    """Only TSB-AD has the combination tables in data/divergence."""
+    return current_benchmark() == DEFAULT_BENCHMARK
+
+
 @st.cache_resource
+def _parser(benchmark: str, kind: str) -> TSBADParser:
+    if benchmark == DEFAULT_BENCHMARK:
+        parser = TSBADParser(path='data', kind=kind)
+    else:
+        parser = TSBADParser(benchmark=benchmark, kind=kind)
+    hidden = HIDDEN_DATASETS.get(benchmark)
+    if hidden:
+        parser.meta = parser.meta[~parser.meta.dataset.isin(hidden)]
+    return parser
+
+
 def get_parser(kind: str = 'uni') -> TSBADParser:
-    return TSBADParser(path='data', kind=kind)
+    return _parser(current_benchmark(), kind)
 
 
 @st.cache_data
+def _metrics(benchmark: str, kind: str) -> pd.DataFrame:
+    parser = _parser(benchmark, kind)
+    metrics = parser.load_metrics(models=parser.get_all_models())
+    if metrics.empty:
+        return metrics
+    return metrics[metrics['File Name'].isin(set(parser.meta.filename))]
+
+
 def cached_metrics(kind: str = 'uni') -> pd.DataFrame:
-    return get_parser(kind).load_metrics(models=get_parser(kind).get_all_models())
+    return _metrics(current_benchmark(), kind)
 
 
 @st.cache_data
+def _runtime(benchmark: str, kind: str) -> pd.DataFrame:
+    parser = _parser(benchmark, kind)
+    return parser.load_runtime(models=parser.get_all_models())
+
+
 def cached_runtime(kind: str = 'uni') -> pd.DataFrame:
-    return get_parser(kind).load_runtime(models=get_parser(kind).get_all_models())
+    return _runtime(current_benchmark(), kind)
 
 
-@st.cache_data
 def cached_meta(kind: str = 'uni') -> pd.DataFrame:
     return get_parser(kind).meta.reset_index()
 
@@ -296,16 +349,26 @@ VUS_BUFFERS = list(range(MAX_VUS_BUFFER + 1))
 TSBAD_VUS_BUFFERS = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256]
 
 
-@st.cache_data
 def combo_datasets(kind: str = 'uni') -> list[str]:
+    """Datasets whose step-3 shard exists. TSB-AD only; empty elsewhere."""
+    return _combo_datasets(kind) if is_tsb_ad() else []
+
+
+@st.cache_data
+def _combo_datasets(kind: str = 'uni') -> list[str]:
     """Datasets whose step-3 shard exists. Grows as the sweep finishes."""
     shards = DIVERGENCE_DIR.glob(f'combos_{kind}_*.parquet')
     names = [s.stem.replace(f'combos_{kind}_', '') for s in shards]
     return sorted(n for n in names if n != 'detectors')
 
 
-@st.cache_data
 def cached_combo_detectors(kind: str = 'uni') -> list[str]:
+    """Detector roster the d0/d1/d2 columns index into. TSB-AD only."""
+    return _combo_detectors(kind) if is_tsb_ad() else []
+
+
+@st.cache_data
+def _combo_detectors(kind: str = 'uni') -> list[str]:
     """Detector roster the d0/d1/d2 columns index into."""
     path = DIVERGENCE_DIR / f'combos_{kind}_detectors.parquet'
     if not path.exists():
@@ -313,8 +376,13 @@ def cached_combo_detectors(kind: str = 'uni') -> list[str]:
     return pd.read_parquet(path)['detector'].tolist()
 
 
-@st.cache_data
 def cached_combos(kind: str, dataset: str, buffer: int) -> pd.DataFrame:
+    """Every combination for one dataset at one buffer. TSB-AD only."""
+    return _combos(kind, dataset, buffer) if is_tsb_ad() else pd.DataFrame()
+
+
+@st.cache_data
+def _combos(kind: str, dataset: str, buffer: int) -> pd.DataFrame:
     """Every combination for one dataset, with VUS at one buffer only.
 
     The shard stores all 257 buffers as separate columns precisely so this can
@@ -484,8 +552,13 @@ HEURISTIC_COLORS = {
 }
 
 
-@st.cache_data
 def cached_heuristics(kind: str = 'uni') -> pd.DataFrame:
+    """Step 4 output. TSB-AD only; empty elsewhere."""
+    return _heuristics(kind) if is_tsb_ad() else pd.DataFrame()
+
+
+@st.cache_data
+def _heuristics(kind: str = 'uni') -> pd.DataFrame:
     """Step 4 output for every dataset computed so far, concatenated.
 
     One row per (series, k, VUS buffer, heuristic). Small enough to hold whole
@@ -503,9 +576,15 @@ def cached_heuristics(kind: str = 'uni') -> pd.DataFrame:
     return table
 
 
-@st.cache_data
 def cached_solo_baseline(kind: str = 'uni',
                          buffers: tuple[int, ...] = ()) -> pd.DataFrame:
+    """Best single detector per (series, buffer). TSB-AD only."""
+    return _solo_baseline(kind, buffers) if is_tsb_ad() else pd.DataFrame()
+
+
+@st.cache_data
+def _solo_baseline(kind: str = 'uni',
+                   buffers: tuple[int, ...] = ()) -> pd.DataFrame:
     """Best single detector per (series, buffer) -- what every set is read against.
 
     Taken from the k=1 rows of the combination shards, so it is the same number
@@ -551,7 +630,20 @@ def _sticky(state_key: str, default, widget):
 
 
 def vus_buffer_selector(label: str = 'VUS buffer (L)') -> int:
-    """Sidebar control for which VUS buffer every number on the page is read at."""
+    """Sidebar control for which VUS buffer every number on the page is read at.
+
+    TSB-AD's combination tables hold all 257 buffers; every other benchmark
+    only has the ten its metric files report, so there the slider snaps.
+    """
+    if not is_tsb_ad():
+        return _sticky('combo_buffer', DEFAULT_VUS_BUFFER, lambda current: (
+            st.sidebar.select_slider(
+                label, options=TSBAD_VUS_BUFFERS,
+                value=min(TSBAD_VUS_BUFFERS, key=lambda b: abs(b - int(current))),
+                help=('VUS-PR averages AUC-PR over buffers 0..L. L=0 is strict '
+                      'pointwise; larger L forgives timing error. This '
+                      'benchmark has VUS-PR at these ten buffers.'),
+            )))
     return _sticky('combo_buffer', DEFAULT_VUS_BUFFER, lambda current: (
         st.sidebar.slider(
             label, 0, MAX_VUS_BUFFER,
@@ -774,8 +866,13 @@ def window_selector(label: str = 'Tolerance window') -> int:
     )
 
 
-@st.cache_data
 def cached_pair_agreement(kind: str = 'uni') -> pd.DataFrame:
+    """Step 1 output. TSB-AD only; empty elsewhere."""
+    return _pair_agreement(kind) if is_tsb_ad() else pd.DataFrame()
+
+
+@st.cache_data
+def _pair_agreement(kind: str = 'uni') -> pd.DataFrame:
     """Step 1 output: Spearman correlation of every detector pair on every series.
 
     Returns an empty DataFrame if the file has not been built yet, so pages can

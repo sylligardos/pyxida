@@ -20,6 +20,9 @@ import streamlit as st
 
 from lib import (
     MIN_COVERAGE,
+    benchmark_label,
+    current_benchmark,
+    is_tsb_ad,
     cached_combo_detectors,
     cached_combos,
     cached_heuristics,
@@ -119,6 +122,15 @@ def shortlist_agreement(kind: str, buffer: int, threshold: float,
 # ---------------------------------------------------------------------------
 # Controls
 # ---------------------------------------------------------------------------
+
+if not is_tsb_ad():
+    st.info(
+        f"Redundancy is read from the exhaustive search over every pair and "
+        f"triplet of detectors, which has been run on TSB-AD only. Switch the "
+        f"benchmark to TSB-AD in the sidebar to see it. "
+        f"(Current: {benchmark_label(current_benchmark())}.)"
+    )
+    st.stop()
 
 buffer = vus_buffer_selector()
 with st.sidebar:

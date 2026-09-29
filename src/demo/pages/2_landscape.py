@@ -21,13 +21,12 @@ import streamlit as st
 
 from lib import (
     benchmark_summary,
-    cached_combo_detectors,
-    cached_combos,
     chart_selection,
-    combo_datasets,
+    current_benchmark,
     get_parser,
     goto_workbench,
     page_header,
+    solo_scores,
     table_selection,
     takeaway,
     vus_buffer_selector,
@@ -48,40 +47,27 @@ page_header(
 # ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner="Reading VUS for every series ...")
-def landscape(kind: str, buffer: int) -> pd.DataFrame:
+def landscape(benchmark: str, kind: str, buffer: int) -> pd.DataFrame:
     """One row per series: how far the best and the median detector got.
 
-    Read from the k=1 rows of the step-3 shards, so it is the same number the
-    Workbench ranks with. Detectors that emit a constant on a series are
-    dropped: a constant score has no ranking, so its VUS is an artefact of the
-    anomaly rate rather than a detection.
+    The same solo VUS the Workbench ranks with: on TSB-AD the k=1 rows of the
+    combination search (detectors that emit a constant on a series are dropped
+    there -- a constant score has no ranking, so its VUS is an artefact of the
+    anomaly rate); elsewhere the benchmark's metric files.
     """
-    roster = cached_combo_detectors(kind)
-    if not roster:
+    solo = solo_scores(kind, buffer)
+    if solo.empty:
         return pd.DataFrame()
 
-    rows = []
-    for dataset in combo_datasets(kind):
-        frame = cached_combos(kind, dataset, buffer)
-        if frame.empty:
-            continue
-        solo = frame[(frame.k == 1) & (frame.n_constant == 0)]
-        if solo.empty:
-            continue
-        grouped = solo.groupby("filename")
-        best = solo.loc[grouped.vus.idxmax()].set_index("filename")
-        rows.append(pd.DataFrame({
-            "dataset": best.dataset,
-            "best_vus": best.vus,
-            "best_detector": [roster[i] for i in best.d0],
-            "median_vus": grouped.vus.median(),
-            "n_detectors": grouped.vus.size(),
-        }))
-
-    if not rows:
-        return pd.DataFrame()
-
-    table = pd.concat(rows).reset_index()
+    grouped = solo.groupby("filename")
+    best = solo.loc[grouped.vus.idxmax()].set_index("filename")
+    table = pd.DataFrame({
+        "dataset": best.dataset,
+        "best_vus": best.vus,
+        "best_detector": best.detector,
+        "median_vus": grouped.vus.median(),
+        "n_detectors": grouped.vus.size(),
+    }).reset_index()
     meta = get_parser(kind).meta.reset_index()[["filename", "entity_type"]]
     summary = benchmark_summary(kind)
     return (table.merge(meta, on="filename", how="left")
@@ -92,12 +78,12 @@ def landscape(kind: str, buffer: int) -> pd.DataFrame:
 
 
 buffer = vus_buffer_selector()
-table = landscape(KIND, buffer)
+table = landscape(current_benchmark(), KIND, buffer)
 
 if table.empty:
     st.info(
-        "No combination shards yet. Run `src/divergence/run_step3_all.sh` from "
-        "the ffvus environment."
+        "No detector scores for this benchmark yet. Score it with "
+        "`src/metrics/run_detectors.py`, then `src/metrics/compute_metrics.py`."
     )
     st.stop()
 
@@ -245,7 +231,8 @@ open_cases = float((scoped[column] < 0.3).mean()) if len(scoped) else 0.0
 st.caption(
     f"{100 * solved:.0f}% of these series are solved (VUS above 0.9) and "
     f"{100 * open_cases:.0f}% are open (below 0.3). "
-    f"Read over {len(cached_combo_detectors(KIND))} detectors at L={buffer}."
+    f"Read over {table.n_detectors.max()} detectors at L={buffer}, on the "
+    f"{len(table)} series that have scores."
 )
 
 takeaway("Stop tuning on the solved datasets. The open problems are on the left.")

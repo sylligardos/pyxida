@@ -16,7 +16,10 @@ from lib import (
     REPO_DATA,
     REPO_PARSER,
     REPO_TEMPLATE,
+    benchmark_label,
+    current_benchmark,
     get_parser,
+    is_tsb_ad,
     page_header,
     ranked,
     set_scores,
@@ -66,6 +69,14 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 st.subheader("What to run on your data")
+
+if not is_tsb_ad():
+    st.info(
+        f"The recommendation comes from the exhaustive search over pairs of "
+        f"detectors, run on TSB-AD only. Switch the benchmark to TSB-AD to see "
+        f"it. (Current: {benchmark_label(current_benchmark())}.)"
+    )
+    st.stop()
 
 buffer = vus_buffer_selector()
 solo = solo_scores(KIND, buffer)

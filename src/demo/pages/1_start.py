@@ -12,14 +12,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import streamlit as st
 
 from lib import (
-    DEMO_SERIES,
     ONE_SENTENCE,
     REPO_DATA,
     REPO_PARSER,
     REPO_TEMPLATE,
     TAGLINE,
     TITLE,
+    BENCHMARK_NOTES,
+    benchmark_label,
     benchmark_summary,
+    current_benchmark,
+    demo_series,
     get_parser,
     paper_author,
     plot_series_plotly,
@@ -27,19 +30,21 @@ from lib import (
 )
 
 KIND = "uni"
+BENCHMARK = current_benchmark()
+DEMO_SERIES = demo_series(KIND)
 
 # What the demo shows below the snippet is what the snippet produces. Kept as a
 # string so the two cannot drift into a lie: the page runs these exact calls.
 SNIPPET = f'''from tsbadparser import TSBADParser
 
-parser = TSBADParser(path="data", kind="uni")
+parser = TSBADParser(benchmark="{BENCHMARK}", kind="uni")
 names, series, labels = parser.load_timeseries(
     filename=["{DEMO_SERIES}"])
 parser.visualize_timeseries(series[0], anomaly_labels=labels[0], title=names[0])'''
 
 
 @st.cache_data
-def load_demo_series(kind: str, filename: str):
+def load_demo_series(benchmark: str, kind: str, filename: str):
     names, series, labels = get_parser(kind).load_timeseries(filename=[filename])
     return names[0], series[0], labels[0]
 
@@ -61,19 +66,28 @@ st.divider()
 # --- The benchmark at a glance -------------------------------------------
 summary = benchmark_summary(KIND)
 
-st.subheader("TSB-AD, univariate")
+st.subheader(f"{benchmark_label(BENCHMARK)}, univariate")
 columns = st.columns(5)
 columns[0].metric("Series", f"{summary['n_series']:,}")
 columns[1].metric("Datasets", summary["n_datasets"])
-columns[2].metric("Anomalies", f"{summary.get('n_anomalies', 0):,}")
+if "n_anomalies" in summary:
+    columns[2].metric("Anomalies", f"{summary['n_anomalies']:,}")
+else:
+    columns[2].metric("Scored series", f"{summary.get('n_scored_series', 0):,}")
 columns[3].metric("Detectors", summary["n_detectors"])
 columns[4].metric("Points", f"{summary.get('n_points', 0) / 1e6:.1f}M")
-st.caption(
-    f"Every detector scored every series: "
-    f"{summary['n_detectors'] * summary['n_series']:,} score files, "
-    f"{summary.get('n_entity_types', 0)} entity types, "
-    f"from [TSB-AD]({REPO_DATA}). Counts are read from the data, not typed in."
-)
+if BENCHMARK == "tsb-ad":
+    st.caption(
+        f"Every detector scored every series: "
+        f"{summary['n_detectors'] * summary['n_series']:,} score files, "
+        f"{summary.get('n_entity_types', 0)} entity types, "
+        f"from [TSB-AD]({REPO_DATA}). Counts are read from the data, not typed in."
+    )
+else:
+    st.caption(
+        f"{BENCHMARK_NOTES.get(BENCHMARK, '')} Same format as TSB-AD, so every "
+        "page reads it the same way. Counts are read from the data, not typed in."
+    )
 
 st.divider()
 
@@ -101,7 +115,7 @@ with left:
         f"[Parser repo]({REPO_PARSER}) · [Project template]({REPO_TEMPLATE})"
     )
 with right:
-    name, series, labels = load_demo_series(KIND, DEMO_SERIES)
+    name, series, labels = load_demo_series(BENCHMARK, KIND, DEMO_SERIES)
     st.plotly_chart(
         plot_series_plotly(series, labels, title=name),
         width='stretch',

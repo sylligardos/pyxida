@@ -18,7 +18,6 @@ import pandas as pd
 import streamlit as st
 
 from lib import (
-    DEMO_SERIES,
     WORKBENCH_ANOMALY_KEY,
     WORKBENCH_COMBOS_KEY,
     WORKBENCH_KEY,
@@ -30,6 +29,8 @@ from lib import (
     cached_metrics,
     combined_score,
     combo_datasets,
+    current_benchmark,
+    demo_series,
     get_parser,
     load_notes,
     page_header,
@@ -53,6 +54,10 @@ page_header(
 
 parser = get_parser(KIND)
 meta = parser.meta.reset_index()
+# Every cache below takes the benchmark: two benchmarks can hold series with the
+# same file name (0001_Daphnet_... exists in TSB-UAD and in TAB).
+BENCH = current_benchmark()
+DEMO_SERIES = demo_series(KIND)
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +65,13 @@ meta = parser.meta.reset_index()
 # ---------------------------------------------------------------------------
 
 @st.cache_data(show_spinner="Loading series ...")
-def load_series(kind: str, filename: str):
+def load_series(bench: str, kind: str, filename: str):
     names, series, labels = get_parser(kind).load_timeseries(filename=[filename])
     return series[0], labels[0]
 
 
 @st.cache_data
-def solo_vus(kind: str, dataset: str, buffer: int, filename: str) -> pd.Series:
+def solo_vus(bench: str, kind: str, dataset: str, buffer: int, filename: str) -> pd.Series:
     """Solo VUS-PR for every detector on one series, at one L.
 
     Read from the step-3 shards, which store all 257 buffers, so the slider is
@@ -95,7 +100,7 @@ def solo_vus(kind: str, dataset: str, buffer: int, filename: str) -> pd.Series:
 
 
 @st.cache_data
-def score_of(kind: str, filename: str, detector: str):
+def score_of(bench: str, kind: str, filename: str, detector: str):
     """One detector's score on one series, or None if it is missing there."""
     _, scores, _ = get_parser(kind).load_scores(
         detectors=[detector], filenames=[filename],
@@ -105,13 +110,13 @@ def score_of(kind: str, filename: str, detector: str):
 
 
 @st.cache_data
-def combo_score(kind: str, filename: str, members: tuple):
+def combo_score(bench: str, kind: str, filename: str, members: tuple):
     """The averaged score of a set -- the thing its VUS was computed on."""
     return combined_score(get_parser(kind), filename, list(members))
 
 
 @st.cache_data
-def combo_vus(kind: str, dataset: str, buffer: int, filename: str,
+def combo_vus(bench: str, kind: str, dataset: str, buffer: int, filename: str,
               members: tuple) -> float | None:
     """VUS-PR of one combination, looked up rather than recomputed.
 
@@ -208,7 +213,7 @@ with st.sidebar:
 
 filename = st.session_state["wb_series"]
 
-series, labels = load_series(KIND, filename)
+series, labels = load_series(BENCH, KIND, filename)
 starts, ends = anomaly_bounds(labels)
 row = meta[meta.filename == filename].iloc[0]
 
@@ -224,7 +229,7 @@ columns[2].metric("Length", f"{len(series):,}")
 columns[3].metric("Anomalies", len(starts))
 columns[4].metric("Anomalous", f"{100 * float(np.mean(labels)):.2f}%")
 
-ranking = solo_vus(KIND, row.dataset, buffer, filename)
+ranking = solo_vus(BENCH, KIND, row.dataset, buffer, filename)
 rank_of = {name: position for position, name in enumerate(ranking.index, start=1)}
 ranked = not ranking.empty
 
@@ -294,7 +299,7 @@ entries = [
 # Combinations get a tile too, not just a row on the chart: "what does the pair
 # actually score" is the question the Redundancy page sends people here with.
 for members in combos:
-    value = combo_vus(KIND, row.dataset, buffer, filename, members)
+    value = combo_vus(BENCH, KIND, row.dataset, buffer, filename, members)
     entries.append(("Σ " + " + ".join(members),
                     f"{value:.3f}" if value is not None else "--"))
 
@@ -330,7 +335,7 @@ else:
 
 traces, names, unavailable = [], [], []
 for detector, is_pinned in shown.items():
-    score = score_of(KIND, filename, detector)
+    score = score_of(BENCH, KIND, filename, detector)
     if score is None or len(score) != len(labels):
         unavailable.append(detector)
         continue
@@ -347,13 +352,13 @@ for detector, is_pinned in shown.items():
 # Combinations last, under their members: the members explain the row above
 # them, and the reader should meet them in that order.
 for members in combos:
-    score = combo_score(KIND, filename, members)
+    score = combo_score(BENCH, KIND, filename, members)
     if score is None or len(score) != len(labels):
         unavailable.append(" + ".join(members))
         continue
     traces.append(score)
     label = "Σ " + " + ".join(members)
-    value = combo_vus(KIND, row.dataset, buffer, filename, members)
+    value = combo_vus(BENCH, KIND, row.dataset, buffer, filename, members)
     if value is not None:
         label += f"<br>VUS {value:.3f}"
     names.append(label)
