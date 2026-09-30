@@ -12,7 +12,10 @@ $RUN --benchmark timeeval --kind multi --datasets SMD Daphnet --detectors $MULTI
 $RUN --benchmark tab --kind uni   --datasets NAB YAHOO NASA-MSL-new NASA-SMAP-new MGAB --detectors $UNI
 $RUN --benchmark tab --kind multi --datasets ASD SKAB TAO --detectors $MULTI
 
-for b in timeeval tab; do
+$RUN --benchmark mtsbench --kind multi \
+  --datasets SMD Daphnet MSL SMAP CalIt2 Genesis room-occupancy metro GECCO PSM --detectors $MULTI
+
+for b in timeeval tab mtsbench; do
   conda run -n ffvus python src/metrics/compute_metrics.py --benchmark $b
 done
 echo "=== examples done"
