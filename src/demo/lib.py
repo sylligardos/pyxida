@@ -76,6 +76,7 @@ BENCHMARK_LABELS = {
     "tsb-uad": "TSB-UAD",
     "timeeval": "TimeEval",
     "tab": "TAB",
+    "mtsbench": "mTSBench",
 }
 BENCHMARK_NOTES = {
     "tsb-ad": "Complete: every detector on every series, plus the exhaustive "
@@ -85,6 +86,7 @@ BENCHMARK_NOTES = {
     "timeeval": "Examples only: a few collections, 6 fast detectors. "
                 "TimeEval's TSB-UAD collections are left out.",
     "tab": "Examples only: a few collections, 6 fast detectors.",
+    "mtsbench": "Multivariate only. Data converted; no detector scores yet.",
 }
 
 # Page state that points into one benchmark and is meaningless in another.

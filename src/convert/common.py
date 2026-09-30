@@ -75,6 +75,9 @@ DOMAINS = {
     # synthetic
     "MGAB": "Synthetic", "GutenTAG": "Synthetic", "TODS": "Synthetic", "TODS-synthetic": "Synthetic",
     "TSB-UAD-artificial": "Synthetic", "TSB-UAD-synthetic": "Synthetic",
+    # mTSBench's lower-case dataset names
+    "cicids": "WebService", "creditcard": "Finance", "metro": "Traffic",
+    "room-occupancy": "Facility", "swan": "Environment",
     # UCR archive: many sources in one dataset
     "KDD21": "Mixed", "KDD-TSAD": "Mixed", "NormA": "Mixed",
 }
