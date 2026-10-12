@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Needle Sound Audition</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 24px 60px; display: flex; flex-direction: column; gap: 28px; }
+  h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(2.2rem, 5vw, 3.6rem); }
+  h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--yellow); }
+  p { margin: 0; color: var(--text-2); line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(0, 2fr) repeat(3, 110px); gap: 8px 12px; align-items: center; }
+  .grid .hd { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); }
+  .grid .ev { font-family: var(--mono); font-weight: 700; color: var(--text); }
+  .grid .when { font-size: 14px; color: var(--text-2); }
+  .play { height: 40px; border-radius: 8px; cursor: pointer; font-family: var(--mono); font-size: 13px; font-weight: 700;
+    background: transparent; color: var(--text); border: 2px solid var(--c); }
+  .play:hover, .play:active { background: var(--c); color: var(--bg); }
+  .demo { display: flex; gap: 12px; flex-wrap: wrap; }
+  .demo .play { padding: 0 18px; height: 48px; }
+  .tracks { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .track b { font-family: var(--display); font-weight: 400; font-size: 18px; }
+  .track .meta { font-family: var(--mono); font-size: 12px; color: var(--text-3); }
+  .track .use { font-size: 14px; color: var(--player-soft); }
+  .track audio { width: 100%; }
+  .track a { color: var(--det); }
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: 1fr repeat(3, 1fr); }
+    .grid .when, .grid .hd:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow" style="color:var(--yellow)">Needle · sound audition</span>
+    <h1 class="glitch">PICK THE SOUNDS</h1>
+    <p>Sound effects are synthesised in the browser, so they cost nothing and need no licence. Each game event in three styles: <b style="color:var(--player)">arcade</b> (square waves, coin-op), <b style="color:var(--det)">neon</b> (soft, with echo), <b style="color:var(--yellow)">laser</b> (saw sweeps and noise). Music is CC0 from OpenGameArt: free, no payment, no credit required.</p>
+  </header>
+
+  <section class="panel" style="gap:16px">
+    <h2>A WHOLE ROUND, IN EACH STYLE</h2>
+    <p>Press play, mark two ranges, submit, a hit, a false alarm, a clean decoy, then the round win.</p>
+    <div class="demo">
+      <button class="play" style="--c:var(--player)" data-demo="arcade">▶ ARCADE</button>
+      <button class="play" style="--c:var(--det)" data-demo="neon">▶ NEON</button>
+      <button class="play" style="--c:var(--yellow)" data-demo="laser">▶ LASER</button>
+    </div>
+  </section>
+
+  <section class="panel" style="gap:14px">
+    <h2>EVENT BY EVENT</h2>
+    <div class="grid" id="grid">
+      <span class="hd">Event</span><span class="hd">When it plays</span>
+      <span class="hd" style="color:var(--player)">Arcade</span><span class="hd" style="color:var(--det)">Neon</span><span class="hd" style="color:var(--yellow)">Laser</span>
+    </div>
+  </section>
+
+  <section class="panel" style="gap:16px">
+    <h2>WHILE YOU MARK: THE CLOCK IS RUNNING</h2>
+    <p>Each plays one whole series, sped up twice: 40 seconds in 20. It builds as time runs out; the tick-tock of the last 10 seconds and the time-up buzzer play on top, as in the game. Try one inside a real round with <span class="mono" style="color:var(--yellow)">/?ambient=sonar</span>.</p>
+    <div class="demo" id="amb"></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span class="clock mono" id="amb-clock" style="padding:6px 10px;border-radius:6px;border:1px solid var(--line);font-weight:700">00:40</span>
+      <div style="flex:1;height:6px;border-radius:3px;background:var(--grid);overflow:hidden"><i id="amb-bar" style="display:block;height:100%;width:100%;background:var(--yellow)"></i></div>
+      <button class="play" style="--c:var(--text);padding:0 14px" id="amb-stop">■ STOP</button>
+    </div>
+  </section>
+
+  <section class="panel" style="gap:16px">
+    <h2>MUSIC (CC0)</h2>
+    <p>For the attract screens (Start, Leaderboard) and maybe very quietly during a round. A round needs concentration, so music could also stop while you mark and come back on the Reveal.</p>
+    <div class="tracks" id="tracks"></div>
+  </section>
+</div>
+
+<script type="module">
+import { sfx, ambient } from '/static/sfx.js';
+
+const WHEN = {
+  tick: 'Any small button: layer toggle, answer, Reset view',
+  coin: 'PRESS PLAY',
+  mark: 'A range is placed',
+  remove: 'A range is removed (×)',
+  limit: 'Trying a sixth range (OUT OF RANGES)',
+  submit: 'SUBMIT or NOTHING HERE',
+  hit: 'Reveal: you found it',
+  detectors: 'Reveal: the detectors found it, you did not',
+  miss: 'Reveal: false alarm or nobody found it',
+  clean: 'Reveal: decoy left clean',
+  win: 'Summary: you beat the detectors',
+  lose: 'Summary: the detectors win',
+};
+const COLOR = { arcade: 'var(--player)', neon: 'var(--det)', laser: 'var(--yellow)' };
+
+const grid = document.getElementById('grid');
+for (const ev of sfx.events) {
+  grid.insertAdjacentHTML('beforeend', `<span class="ev">${ev}</span><span class="when">${WHEN[ev] || ''}</span>` +
+    sfx.styles.map((s) => `<button class="play" style="--c:${COLOR[s]}" data-ev="${ev}" data-st="${s}">▶ ${s}</button>`).join(''));
+}
+grid.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ev]');
+  if (b) sfx.play(b.dataset.ev, b.dataset.st);
+});
+
+const DEMO = [['coin', 0], ['mark', 900], ['mark', 1300], ['submit', 1900], ['hit', 2500],
+  ['miss', 3600], ['clean', 4700], ['win', 5600]];
+document.querySelectorAll('[data-demo]').forEach((b) => {
+  b.onclick = () => DEMO.forEach(([ev, ms]) => setTimeout(() => sfx.play(ev, b.dataset.demo), ms));
+});
+
+const AMB = {
+  march: 'March: four bass notes, faster and faster',
+  heartbeat: 'Heartbeat: lub-dub, quickening',
+  sonar: 'Sonar: a scanning ping, closer together',
+  drone: 'Drone: a low hum that rises',
+  muffled: 'Muffled loop: the battle loop from the next room',
+};
+const ambBox = document.getElementById('amb');
+ambBox.innerHTML = Object.entries(AMB).map(([k, label], i) =>
+  `<button class="play" style="--c:${['var(--player)', 'var(--det)', 'var(--yellow)', 'var(--text)', 'var(--player-soft)'][i]}" data-amb="${k}" title="${label}">▶ ${label}</button>`).join('');
+let demo = null;
+const LIMIT = 40, SPEED = 2;
+const clockEl = document.getElementById('amb-clock'), bar = document.getElementById('amb-bar');
+function stopDemo() {
+  clearInterval(demo); demo = null; ambient.stop();
+  clockEl.textContent = '00:40'; clockEl.className = 'clock mono'; bar.style.width = '100%';
+}
+ambBox.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-amb]');
+  if (!b) return;
+  stopDemo();
+  ambient.start(b.dataset.amb);
+  const t0 = performance.now();
+  let lastSec = null;
+  demo = setInterval(() => {
+    const left = Math.max(0, LIMIT - (performance.now() - t0) / 1000 * SPEED);
+    const sec = Math.ceil(left);
+    ambient.update(1 - left / LIMIT);
+    clockEl.textContent = '00:' + String(sec).padStart(2, '0');
+    clockEl.className = 'clock mono' + (sec <= 10 ? ' warn' : '') + (sec <= 3 ? ' hurry' : '');
+    bar.style.width = (left / LIMIT * 100) + '%';
+    if (sec !== lastSec) {
+      lastSec = sec;
+      if (sec > 0 && sec <= 3) sfx.play('hurry');
+      else if (sec > 0 && sec <= 10) sfx.play(sec % 2 ? 'clock' : 'clock2');
+    }
+    if (left <= 0) { sfx.play('timeup'); stopDemo(); }
+  }, 50);
+});
+document.getElementById('amb-stop').onclick = stopDemo;
+
+const F = 'https://opengameart.org/sites/default/files/';
+const TRACKS = [
+  { title: 'Chip Bit Danger', by: 'Sudocolon', page: 'https://opengameart.org/content/chip-bit-danger',
+    src: F + 'Chip%20Bit%20Danger.mp3', use: 'Upbeat action loop. Attract screens.' },
+  { title: '8-Bit Battle Loop', by: 'Wolfgang_', page: 'https://opengameart.org/content/8-bit-battle-loop',
+    src: F + '8BitBattleLoop_0.ogg', use: 'Driving NES-style loop. Attract screens, or under the round.' },
+  { title: 'The Arplands', by: 'LordZintick', page: 'https://opengameart.org/content/the-arplands',
+    src: F + 'the_arplands_0.ogg', use: 'Arpeggio adventure loop, calmer. Could sit under a round.' },
+  { title: 'Void Estate', by: 'Zane Little Music', page: 'https://opengameart.org/content/haunting-chiptune-loop-void-estate',
+    src: F + 'void_estate_0.ogg', use: 'Eerie loop. For the "unsolved" mood.' },
+  { title: 'Void Estate (haunted arcade)', by: 'Zane Little Music', page: 'https://opengameart.org/content/haunting-chiptune-loop-void-estate',
+    src: F + 'void_estate_haunted_arcade_0.ogg', use: 'Same, as if from an old cabinet across the room.' },
+  { title: 'Victory', by: 'celestialghost8', page: 'https://opengameart.org/content/victory',
+    src: F + 'Victory_0.mp3', use: 'Short NES victory fanfare. Summary, when you win.' },
+];
+document.getElementById('tracks').innerHTML = TRACKS.map((t) => `
+  <div class="panel track">
+    <b>${t.title}</b>
+    <span class="meta">${t.by} · CC0 · <a href="${t.page}" target="_blank" rel="noopener">page</a></span>
+    <span class="use">${t.use}</span>
+    <audio controls loop preload="none" src="${t.src}"></audio>
+  </div>`).join('');
+// One track at a time.
+document.addEventListener('play', (e) => {
+  document.querySelectorAll('audio').forEach((a) => { if (a !== e.target) a.pause(); });
+}, true);
+</script>
+</body>
+</html>

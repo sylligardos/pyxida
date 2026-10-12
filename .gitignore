@@ -46,3 +46,6 @@ references/
 # Derived tables (regenerable; divergence is ~4GB)
 data/divergence/
 data/anomaly_features_*.parquet
+
+# Needle content packs and play logs (regenerable / private)
+data/game/
