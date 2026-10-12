@@ -140,8 +140,18 @@ def distribution_chart(frame: pd.DataFrame, group: str, scope_kind: str) -> go.F
 
 
 def apply_scope(event, group: str, frame: pd.DataFrame, order_key: str) -> None:
-    """A click anywhere in a box scopes the tables to that box."""
+    """A click anywhere in a box scopes the tables to that box.
+
+    Only a *new* click counts. A chart's selection stays in its widget state
+    across reruns, so applying it on every run made "Clear scope" undo itself,
+    and with a box picked in each tab the second tab always won.
+    """
     points = chart_selection(event)
+    seen_key = f"ls_seen_{group}"
+    signature = repr(points)
+    if st.session_state.get(seen_key) == signature:
+        return
+    st.session_state[seen_key] = signature
     if not points:
         return
     point = points[0]
@@ -163,7 +173,8 @@ for tab, group, key in ((by_dataset, "dataset", "ls_order_dataset"),
         st.session_state[key] = order
         event = st.plotly_chart(
             distribution_chart(visible, group, key),
-            width='stretch', on_select="rerun", key=f"ls_chart_{group}",
+            width='stretch', on_select="rerun",
+            key=f"ls_chart_{group}_{st.session_state.get('ls_reset', 0)}",
         )
         apply_scope(event, group, visible, key)
         st.caption(
@@ -186,6 +197,10 @@ if scope:
     left.markdown(f"**Scoped to `{value}`** — {len(scoped)} series")
     if right.button("Clear scope", width='stretch'):
         del st.session_state[SCOPE_KEY]
+        # New chart keys drop the selection drawn on the boxes as well.
+        st.session_state["ls_reset"] = st.session_state.get("ls_reset", 0) + 1
+        for name in ("ls_seen_dataset", "ls_seen_entity_type"):
+            st.session_state.pop(name, None)
         st.rerun()
 
 COLUMNS = {
@@ -217,6 +232,10 @@ def clickable(frame: pd.DataFrame, key: str) -> None:
     if rows:
         goto_workbench(frame.iloc[rows[0]].filename)
 
+
+# Anomaly counts and lengths come from the benchmark summary, which only some
+# benchmarks have. A column of "None" says nothing.
+SHOW = [c for c in SHOW if scoped[c].notna().any()] if len(scoped) else SHOW
 
 hardest, easiest = st.columns(2)
 with hardest:

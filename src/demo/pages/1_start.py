@@ -18,6 +18,7 @@ from lib import (
     REPO_TEMPLATE,
     TAGLINE,
     TITLE,
+    WORKBENCH_SAMPLE_KEY,
     BENCHMARK_NOTES,
     benchmark_label,
     benchmark_summary,
@@ -32,6 +33,7 @@ from lib import (
 )
 
 KIND = current_kind()
+MAX_CHANNELS = 3
 BENCHMARK = current_benchmark()
 DEMO_SERIES = demo_series(KIND)
 if DEMO_SERIES is None:
@@ -126,6 +128,10 @@ with left:
     )
 with right:
     name, series, labels = load_demo_series(BENCHMARK, KIND, DEMO_SERIES)
+    # A multivariate series can have 100+ channels; the first few make the point.
+    if series.ndim == 2 and series.shape[1] > MAX_CHANNELS:
+        series = series[:, :MAX_CHANNELS]
+        st.caption(f"First {MAX_CHANNELS} channels shown.")
     st.plotly_chart(
         plot_series_plotly(series, labels, title=name),
         width='stretch',
@@ -142,6 +148,7 @@ takeaway("Everything here is one pip install away.")
 
 left, right = st.columns(2)
 if left.button("🔬 Sample a series", width='stretch'):
+    st.session_state[WORKBENCH_SAMPLE_KEY] = True
     st.switch_page("pages/4_workbench.py")
 if right.button("🚀 Get started", width='stretch'):
     st.switch_page("pages/5_get_started.py")

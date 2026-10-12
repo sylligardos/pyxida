@@ -35,6 +35,7 @@ from lib import (
     goto_workbench,
     page_header,
     ranked,
+    scope_selectbox,
     set_scores,
     solo_scores,
     table_selection,
@@ -386,7 +387,9 @@ with pays:
 # What to use
 # ---------------------------------------------------------------------------
 
-with use:
+def what_to_use() -> None:
+    """The third tab. A function so an empty scope can return early -- a
+    st.stop() here would also take the page's takeaway with it."""
     meta = get_parser(KIND).meta.reset_index()[["filename", "dataset", "entity_type"]]
     sets = set_scores(KIND, buffer, k)
     if sets.empty:
@@ -399,12 +402,12 @@ with use:
         left, right = st.columns(2)
         # Page 5 opens on whatever scope was last looked at here, so the advice
         # a reader leaves with is the advice they were just reading.
-        dataset_scope = left.selectbox(
-            "Dataset", ["All datasets"] + sorted(sets.dataset.unique()),
-            key="scope_dataset")
-        type_scope = right.selectbox(
-            "Entity type", ["All types"] + sorted(sets.entity_type.dropna().unique()),
-            key="scope_type")
+        dataset_scope = scope_selectbox(
+            left, "Dataset", ["All datasets"] + sorted(sets.dataset.unique()),
+            "scope_dataset")
+        type_scope = scope_selectbox(
+            right, "Entity type",
+            ["All types"] + sorted(sets.entity_type.dropna().unique()), "scope_type")
 
         def scope(frame: pd.DataFrame) -> pd.DataFrame:
             if dataset_scope != "All datasets":
@@ -427,7 +430,7 @@ with use:
                             .sort_values("vus", ascending=False))
             if single_board.empty:
                 st.info("No detector covers enough of this scope.")
-                st.stop()
+                return
             baseline_name = single_board.index[0]
             baseline_vus = float(single_board.vus.iloc[0])
 
@@ -447,7 +450,7 @@ with use:
 
             if board.empty:
                 st.info(f"No {k}-set is scored on enough of this scope.")
-                st.stop()
+                return
 
             headline = st.columns(3)
             headline[0].metric(f"Best single here", f"{baseline_vus:.3f}",
@@ -514,6 +517,10 @@ with use:
                 members = combination.split(" + ")
                 goto_workbench(target.filename, detectors=members,
                                combos=[members])
+
+
+with use:
+    what_to_use()
 
 takeaway(
     "Do not stack the leaderboard. Combine when your best single detector is "

@@ -224,6 +224,31 @@ def test_bad_requests(client):
     assert client.post(f"/api/round/{rid}/0/submit", json={"ranges": "x"}).status_code == 400
 
 
+def test_window_holds_only_the_first_anomaly():
+    import random
+
+    from build_pack import usable, window_around_first
+
+    y = np.zeros(5000, dtype=int)
+    y[1200:1230] = y[2000:2010] = y[2600:2610] = 1
+    rng = random.Random(0)
+    for _ in range(20):
+        a, b = window_around_first(y, 4000, rng, max_labels=1)
+        assert a <= 1200 and 1229 < b <= 2000
+        assert labels_to_ranges(y[a:b]) == [[1200 - a, 1229 - a]]
+    a, b = window_around_first(y, 4000, rng, max_labels=2)
+    assert len(labels_to_ranges(y[a:b])) <= 2 and b <= 2600
+    a, b = window_around_first(y, 4000, rng, max_labels=0)
+    assert b - a == 4000 and a <= 1200 < b
+    short = np.zeros(800, dtype=int)
+    short[100:110] = 1
+    assert window_around_first(short, 4000, rng) == (0, 800)
+
+    assert usable(np.arange(100))
+    assert not usable(np.ones(100))
+    assert not usable([1.0, np.nan, 2.0])
+
+
 def test_build_pack_on_a_tiny_benchmark(tmp_path):
     """build_pack.py end to end, on a fake benchmark in the common format."""
     pd = pytest.importorskip("pandas")
@@ -233,7 +258,7 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
     dets = ["DetA", "DetB", "DetC"]
     rng = np.random.default_rng(0)
     rows = {d: [] for d in dets}
-    for k in range(12):
+    for k in range(14):
         n = 3000 + 500 * k
         first = 1200 + 40 * k
         name = f"{k + 1:03d}_FAKE_id_{k + 1}_Sensor_tr_500_1st_{first}.csv"
@@ -241,6 +266,11 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
         y[first:first + 30] = 1
         v = np.sin(np.arange(n) / 20) + rng.normal(0, 0.1, n)
         v[first:first + 30] += 2
+        if k == 12:                 # three anomalies: the window must hold only the first
+            y[first + 900:first + 930] = y[first + 1800:first + 1830] = 1
+        if k == 13:                 # a flat line: never playable, the only "unsolved" candidate
+            v = np.ones(n)
+            flat = name
         (root / "raw" / "uni").mkdir(parents=True, exist_ok=True)
         pd.DataFrame({"Data": v, "Label": y}).to_csv(root / "raw" / "uni" / name, index=False)
         for j, d in enumerate(dets):
@@ -249,7 +279,8 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
                 s[first:first + 30] += 1
             (root / "scores" / "uni" / d).mkdir(parents=True, exist_ok=True)
             np.save(root / "scores" / "uni" / d / name.replace(".csv", ".npy"), s)
-            rows[d].append({"File Name": name, "Model Name": d, "VUS-PR": 0.9 if j <= k % 3 else 0.1})
+            rows[d].append({"File Name": name, "Model Name": d,
+                            "VUS-PR": 0.9 if (j <= k % 3 or k == 12) and k != 13 else 0.1})
     (root / "metrics" / "uni").mkdir(parents=True)
     for d in dets:
         pd.DataFrame(rows[d]).to_csv(root / "metrics" / "uni" / f"{d}.csv", index=False)
@@ -257,14 +288,17 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
     out = tmp_path / "pack"
     env = {**__import__("os").environ, "TSAD_BENCHMARKS": str(tmp_path / "bench")}
     r = subprocess.run([sys.executable, str(GAME / "build_pack.py"), "--benchmark", "fakebench",
-                        "--detectors", *dets, "--per-tier", "3", "--max-len", "4000", "--out", str(out)],
+                        "--detectors", *dets, "--per-tier", "6", "--max-len", "4000", "--out", str(out)],
                        capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr
 
     from pack import load_pack
     pack = load_pack(out)
     tiers = [s.tier for s in pack.series.values()]
-    assert tiers.count("decoy") == 3 and len(tiers) > 3
+    # 9 easy candidates (two or three detectors solve them), 4 medium, the flat
+    # one unsolved; the decoys come from what is left, the flat one included.
+    assert sorted(tiers) == ["decoy"] * 3 + ["easy"] * 6 + ["medium"] * 4, tiers
+    assert all(s.source["filename"] != flat for s in pack.series.values())
     for s in pack.series.values():
         assert 1000 <= s.n <= 4000
         if s.tier == "decoy":
@@ -272,3 +306,4 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
         else:
             assert len(s.labels) == 1 and s.labels[0][1] - s.labels[0][0] == 29
             assert s.source["filename"].endswith(".csv")
+    assert "unsolved flat x1" in r.stdout and "decoy flat x1" in r.stdout, r.stdout

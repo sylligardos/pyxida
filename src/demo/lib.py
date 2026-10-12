@@ -100,6 +100,30 @@ _PER_BENCHMARK_STATE = [
 KIND_KEY = "demo_kind"
 KIND_LABELS = {"uni": "univariate", "multi": "multivariate"}
 
+# Widget values that have to outlive a st.switch_page. Streamlit reruns into
+# the new page without the browser's widget states, and on a page change it
+# then drops every widget's value -- the sidebar's benchmark included. Every
+# jump into the Workbench used to land on TSB-AD, where the series it was sent
+# to does not exist. A shadow copy, refreshed at the start of every run and
+# written back whenever Streamlit has dropped a key, keeps them.
+_PERSISTENT_STATE = [
+    BENCHMARK_KEY, KIND_KEY,
+    "wb_dataset", "wb_series", "wb_pins", "wb_top_n", "wb_only_scored",
+    "scope_dataset", "scope_type",
+]
+_SHADOW_KEY = "_persisted_state"
+
+
+def keep_widget_state() -> None:
+    """Restore what a page switch dropped, then remember the current values.
+    Called first thing on every run, before any widget is drawn."""
+    shadow = st.session_state.setdefault(_SHADOW_KEY, {})
+    for key in _PERSISTENT_STATE:
+        if key in st.session_state:
+            shadow[key] = st.session_state[key]
+        elif key in shadow:
+            st.session_state[key] = shadow[key]
+
 
 def benchmark_label(name: str) -> str:
     return BENCHMARK_LABELS.get(name, name)
@@ -153,15 +177,19 @@ def benchmark_selector() -> str:
 
     where = (chosen, kind)
     if st.session_state.get("_last_view") not in (None, where):
+        shadow = st.session_state.get(_SHADOW_KEY, {})
         for key in _PER_BENCHMARK_STATE:
             st.session_state.pop(key, None)
+            shadow.pop(key, None)
     st.session_state["_last_view"] = where
     return chosen
 
 
 def demo_series(kind: str = "uni") -> str:
     """Default series for the current benchmark: the Start page's NAB series on
-    TSB-AD, otherwise the shortest series of NAB (or of the first dataset)."""
+    TSB-AD, otherwise the shortest scored series of NAB (or of the whole
+    benchmark). Not "the first dataset": on TimeEval multivariate that is
+    CATSv2, and drawing it sent 1.5 GB to the browser."""
     meta = get_parser(kind).meta
     if meta.empty:
         return None
@@ -169,7 +197,9 @@ def demo_series(kind: str = "uni") -> str:
         return DEMO_SERIES
     lengths = benchmark_summary(kind).get("lengths", {})
     pool = meta[meta.dataset == "NAB"]
-    pool = pool if len(pool) else meta[meta.dataset == meta.dataset.iloc[0]]
+    pool = pool if len(pool) else meta
+    scored = pool[pool.filename.isin(scored_series(kind))]
+    pool = scored if len(scored) else pool
     return min(pool.filename, key=lambda f: lengths.get(f, 10 ** 12))
 
 
@@ -399,6 +429,22 @@ def page_header(title: str, question: str) -> None:
     st.caption(question)
 
 
+def scope_selectbox(container, label: str, options: list, key: str):
+    """The dataset / entity-type scope Redundancy and Get started share.
+
+    One key on both pages, so Get started opens on the scope last read on
+    Redundancy. A remembered value the options lack falls back to the first
+    option instead of making Streamlit raise.
+
+    The value is written back every run, not just when it is invalid: the two
+    pages draw different widgets under the one key, and a widget only adopts a
+    key's value when it was set through the Session State API.
+    """
+    value = st.session_state.get(key)
+    st.session_state[key] = value if value in options else options[0]
+    return container.selectbox(label, options, key=key)
+
+
 def takeaway(text: str) -> None:
     """The single actionable line a page leaves the reader with.
 
@@ -455,6 +501,7 @@ WORKBENCH_KEY = "wb_filename"
 WORKBENCH_PINS_KEY = "wb_arrival_pins"
 WORKBENCH_ANOMALY_KEY = "wb_arrival_anomaly"
 WORKBENCH_COMBOS_KEY = "wb_arrival_combos"
+WORKBENCH_SAMPLE_KEY = "wb_arrival_sample"   # arrive on a random series
 
 NOTES_PATH = REPO_ROOT / "demo_notes.json"
 

@@ -28,8 +28,9 @@ import streamlit as st
 
 st.set_page_config(page_title="Pyxida", page_icon="🧭", layout="wide")
 
-from lib import benchmark_selector, drop_caches_if_data_changed
+from lib import benchmark_selector, drop_caches_if_data_changed, keep_widget_state
 
+keep_widget_state()
 drop_caches_if_data_changed()
 benchmark_selector()
 

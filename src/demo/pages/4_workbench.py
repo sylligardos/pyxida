@@ -22,6 +22,7 @@ from lib import (
     WORKBENCH_COMBOS_KEY,
     WORKBENCH_KEY,
     WORKBENCH_PINS_KEY,
+    WORKBENCH_SAMPLE_KEY,
     anomaly_bounds,
     benchmark_summary,
     cached_combo_detectors,
@@ -69,9 +70,14 @@ DEMO_SERIES = demo_series(KIND)
 # Listing them by default lands the reader on empty plots.
 scored = scored_series(KIND)
 if 0 < len(scored) < len(meta):
+    # A link to a series with no scores would otherwise be filtered out of the
+    # list it is meant to select, and the arrival silently ignored.
+    if st.session_state.get(WORKBENCH_KEY) in set(meta.filename) - scored:
+        st.session_state["wb_only_scored"] = False
+    st.session_state.setdefault("wb_only_scored", True)
     with st.sidebar:
         only_scored = st.checkbox(
-            "Only series with scores", value=True, key="wb_only_scored",
+            "Only series with scores", key="wb_only_scored",
             help=f"{len(scored):,} of {len(meta):,} series in this benchmark have "
                  "detector scores. Untick to browse the rest (series and labels only).")
     if only_scored:
@@ -206,7 +212,9 @@ if not len(default_row) and len(meta):
 if len(default_row):
     st.session_state.setdefault("wb_dataset", default_row.iloc[0].dataset)
     st.session_state.setdefault("wb_series", default_row.iloc[0].filename)
-st.session_state.setdefault("wb_dataset", datasets[0])
+# Remembered from another visit, or from before the filter above changed.
+if st.session_state.get("wb_dataset") not in datasets:
+    st.session_state["wb_dataset"] = datasets[0]
 
 
 def sample_series() -> None:
@@ -222,6 +230,9 @@ def sample_series() -> None:
     st.session_state["wb_dataset"] = pick.dataset
     st.session_state["wb_series"] = pick.filename
 
+
+if st.session_state.pop(WORKBENCH_SAMPLE_KEY, False):
+    sample_series()
 
 with st.sidebar:
     st.button("🎲 Sample a series", on_click=sample_series, width='stretch')
@@ -345,16 +356,23 @@ if entries:
 
 if len(starts) == 0:
     picked = None
+    st.session_state.pop("wb_anomaly", None)
     st.info("This series carries no labelled anomaly.")
 else:
     options = [None] + list(range(len(starts)))
-    # A link can arrive pointing at an anomaly that a later series does not
-    # have, and Streamlit raises rather than falling back.
-    if st.session_state.get("wb_anomaly") not in options:
-        st.session_state["wb_anomaly"] = None
+    # One widget per series. Under a single key Streamlit keeps the widget when
+    # the options change, so moving to another series left the previous
+    # series' range on the label ("#1 2,014-2,148" on a 1,421-point series).
+    # A link's anomaly arrives in wb_anomaly and seeds the new widget once.
+    anomaly_key = f"wb_anomaly_{filename}"
+    seed = st.session_state.pop("wb_anomaly", None)
+    # Only a real index is written: a None in session state reads as "nothing
+    # selected" and shows the placeholder, where the first option is wanted.
+    if seed is not None and seed in options:
+        st.session_state[anomaly_key] = seed
     picked = st.selectbox(
         "Highlight an anomaly",
-        options, key="wb_anomaly",
+        options, key=anomaly_key,
         format_func=lambda i: (
             "Show all of them" if i is None
             else f"#{i + 1}   {starts[i]:,}–{ends[i]:,}   ({ends[i] - starts[i]:,} pts)"
@@ -406,15 +424,17 @@ if not traces:
 plotted = series
 if series.ndim == 2 and series.shape[1] > 1:
     channel_names = channel_labels(BENCH, KIND, filename, series.shape[1])
-    key = "wb_channels"
-    if any(c >= series.shape[1] for c in st.session_state.get(key, [])):
-        st.session_state.pop(key)
+    # One widget per series, as with the anomaly picker. A multiselect keeps
+    # its choice as the displayed labels, so under one key the next series'
+    # channel names did not match and came back as strings (TypeError).
+    key = f"wb_channels_{filename}"
     channels = st.multiselect(
         f"Channels ({series.shape[1]} in this series)", list(range(series.shape[1])),
         default=list(range(min(DEFAULT_CHANNELS, series.shape[1]))),
         max_selections=MAX_CHANNELS, key=key, format_func=lambda c: channel_names[c],
         help="One plot row per channel. Detector scores are for the whole "
              "multivariate series, whichever channels are drawn.")
+    channels = [c for c in channels if isinstance(c, int)]
     plotted = series[:, channels] if channels else series[:, :1]
 
 figure = plot_series_plotly(

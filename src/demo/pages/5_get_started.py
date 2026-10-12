@@ -24,6 +24,7 @@ from lib import (
     has_combos,
     page_header,
     ranked,
+    scope_selectbox,
     set_scores,
     solo_scores,
     takeaway,
@@ -96,8 +97,8 @@ sets = sets.merge(types, on="filename", how="left")
 left, right = st.columns(2)
 datasets = ["All datasets"] + sorted(sets.dataset.unique())
 entity_types = ["All types"] + sorted(sets.entity_type.dropna().unique())
-dataset_scope = left.selectbox("Closest dataset", datasets, key="scope_dataset")
-type_scope = right.selectbox("Your data looks like", entity_types, key="scope_type")
+dataset_scope = scope_selectbox(left, "Closest dataset", datasets, "scope_dataset")
+type_scope = scope_selectbox(right, "Your data looks like", entity_types, "scope_type")
 
 
 def scope(frame):
@@ -133,7 +134,7 @@ scope_label = (type_scope if type_scope != "All types"
 columns = st.columns(3)
 columns[0].metric("Start with", single_name, help=f"Mean VUS-PR {single_vus:.3f}")
 columns[1].metric("Best pair", pair_name or "--",
-                  delta=f"{gain:+.3f} vs the single")
+                  delta=f"{gain:+.3f} vs the single" if pair_name else None)
 columns[2].metric("Series behind this", f"{scoped_sets.filename.nunique():,}")
 
 if gain > 0.01:
@@ -144,8 +145,9 @@ if gain > 0.01:
 else:
     st.success(
         f"**On {scope_label}: run `{single_name}` alone ({single_vus:.3f}). "
-        f"No pair beats it -- the best is {pair_vus:.3f}. Spend the second "
-        f"detector's runtime somewhere else.**"
+        + (f"No pair beats it -- the best is {pair_vus:.3f}. " if pair_name else
+           "No pair is scored on enough of this scope to compare. ")
+        + "Spend the second detector's runtime somewhere else.**"
     )
 st.caption(
     "Every dataset counts once in that average, so the recommendation is not "
