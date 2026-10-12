@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Series chart</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&amp;family=Space+Grotesk:wght@400;500;700&amp;family=Space+Mono:wght@400;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 100%; display: flex; flex-direction: column; gap: 6px; font-family: {{k.font}}; color: {{k.text}}; opacity: {{opacity}}">
+  <div style="position: relative; height: {{h}}px; background: {{panel}}; border-radius: 8px; overflow: hidden">
+    <sc-if value="{{axes}}" hint-placeholder-val="{{ true }}">
+      <div style="position: absolute; left: 0; top: 14px; bottom: 14px; width: 56px">
+        <sc-for list="{{yticks}}" as="t" hint-placeholder-count="4">
+          <div style="position: absolute; right: 12px; top: {{t.top}}%; transform: translateY(-50%); font-family: {{k.mono}}; font-size: 11px; color: {{k.tick}}">{{t.label}}</div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <div style="position: absolute; left: {{pl}}px; right: {{pr}}px; top: {{pt}}px; bottom: {{pt}}px">
+      <sc-if value="{{axes}}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{yticks}}" as="t" hint-placeholder-count="4">
+          <div style="position: absolute; left: 0; right: 0; top: {{t.top}}%; height: 1px; background: {{k.grid}}"></div>
+        </sc-for>
+      </sc-if>
+      <sc-for list="{{truthBands}}" as="b" hint-placeholder-count="1">
+        <div style="position: absolute; top: -14px; bottom: -14px; left: {{b.left}}%; width: {{b.width}}%; min-width: 3px; box-sizing: border-box; background: {{m.truthFill}}; border-left: 1px dashed {{m.truthEdge}}; border-right: 1px dashed {{m.truthEdge}}">
+          <sc-if value="{{b.labelled}}" hint-placeholder-val="{{ true }}">
+            <div style="position: absolute; top: 20px; left: 6px; white-space: nowrap; font-family: {{k.mono}}; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: {{k.truthInk}}; background: {{k.truthChip}}; padding: 3px 6px; border-radius: 3px">{{b.label}}</div>
+          </sc-if>
+        </div>
+      </sc-for>
+      <sc-for list="{{detBands}}" as="r" hint-placeholder-count="1">
+        <div style="position: absolute; top: 0; bottom: -14px; left: {{r.left}}%; width: {{r.width}}%; min-width: 3px; background: {{m.detFill}}">
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; height: {{m.bar}}px; background: {{k.det}}; opacity: {{m.barOpacity}}"></div>
+        </div>
+      </sc-for>
+      <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible">
+        <polyline points="{{pts}}" style="fill: none; stroke: {{stroke}}; stroke-width: {{sw}}px; stroke-linejoin: round; vector-effect: non-scaling-stroke"></polyline>
+      </svg>
+      <sc-for list="{{playerBands}}" as="r" hint-placeholder-count="2">
+        <div style="position: absolute; top: -14px; bottom: -14px; left: {{r.left}}%; width: {{r.width}}%; min-width: 4px; box-sizing: border-box; background: {{m.playerFill}}; border-left: {{m.edge}}px solid {{m.playerEdge}}; border-right: {{m.edge}}px solid {{m.playerEdge}}">
+          <div style="position: absolute; left: 0; right: 0; top: 0; height: {{m.bar}}px; background: {{k.player}}; opacity: {{m.barOpacity}}"></div>
+          <div style="position: absolute; top: 14px; left: 4px; white-space: nowrap; font-family: {{k.mono}}; font-size: 11px; font-weight: 700; color: {{m.tagInk}}; background: {{m.tagBg}}; border: 1px solid {{k.player}}; padding: 1px 6px; border-radius: 3px">{{r.tag}}</div>
+          <sc-if value="{{editable}}" hint-placeholder-val="{{ true }}">
+            <div style="position: absolute; left: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 28px; border-radius: 4px; background: {{k.player}}; box-shadow: 0 0 0 2px {{panel}}"></div>
+            <div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 8px; height: 28px; border-radius: 4px; background: {{k.player}}; box-shadow: 0 0 0 2px {{panel}}"></div>
+            <button aria-label="Remove range {{r.num}}" style="position: absolute; top: 12px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 11px; background: {{k.btn}}; color: {{k.text}}; display: flex; align-items: center; justify-content: center; cursor: pointer">
+              <svg width="10" height="10" viewBox="0 0 10 10" style="fill: none; stroke: currentColor; stroke-width: 1.6px; stroke-linecap: round"><path d="M2 2 L8 8 M8 2 L2 8"></path></svg>
+            </button>
+          </sc-if>
+        </div>
+      </sc-for>
+      <sc-for list="{{dragBands}}" as="r" hint-placeholder-count="0">
+        <div style="position: absolute; top: -14px; bottom: -14px; left: {{r.left}}%; width: {{r.width}}%; box-sizing: border-box; background: {{k.playerFill}}; border: 1px dashed {{k.player}}"></div>
+      </sc-for>
+      <sc-for list="{{winBands}}" as="r" hint-placeholder-count="0">
+        <div style="position: absolute; top: -4px; bottom: -4px; left: {{r.left}}%; width: {{r.width}}%; box-sizing: border-box; border: 1px solid {{k.win}}; border-radius: 3px; background: {{k.winFill}}"></div>
+      </sc-for>
+    </div>
+    <sc-if value="{{loading}}" hint-placeholder-val="{{ false }}">
+      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: {{panel}}">
+        <div style="font-family: {{k.mono}}; font-size: 13px; color: {{k.tick}}">{{loadingText}}</div>
+        <div style="width: 220px; height: 3px; border-radius: 2px; background: {{k.grid}}; overflow: hidden">
+          <div style="width: 42%; height: 100%; background: {{k.player}}"></div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+  <sc-if value="{{showX}}" hint-placeholder-val="{{ true }}">
+    <div style="position: relative; height: 20px; margin-left: {{pl}}px; margin-right: {{pr}}px; cursor: grab">
+      <sc-for list="{{xticks}}" as="t" hint-placeholder-count="6">
+        <div style="position: absolute; top: 2px; left: {{t.left}}%; transform: translateX({{t.shift}}%); font-family: {{k.mono}}; font-size: 11px; color: {{k.tick}}; white-space: nowrap">{{t.label}}</div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{score}}" hint-placeholder-val="{{ true }}">
+    <div style="display: flex; flex-direction: column; gap: 4px; margin-left: {{pl}}px; margin-right: {{pr}}px">
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: {{k.tick}}; letter-spacing: 0.04em">
+        <span>Detector anomaly score</span>
+        <span style="font-family: {{k.mono}}">team average</span>
+      </div>
+      <div style="position: relative; height: 44px; background: {{k.strip}}; border-radius: 6px; overflow: hidden">
+        <sc-for list="{{truthBands}}" as="b" hint-placeholder-count="1">
+          <div style="position: absolute; top: 0; bottom: 0; left: {{b.left}}%; width: {{b.width}}%; min-width: 3px; background: {{m.truthFill}}"></div>
+        </sc-for>
+        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%">
+          <path d="{{scorePath}}" style="fill: {{k.detArea}}; stroke: {{k.det}}; stroke-width: 1.25px; vector-effect: non-scaling-stroke"></path>
+        </svg>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["calm","arcade"],"default":"calm"},"seed":{"editor":null},"n":{"editor":null},"kind":{"editor":null},"anomaly":{"editor":null},"period":{"editor":null},"view":{"editor":null},"player":{"editor":null},"det":{"editor":null},"truth":{"editor":null},"truthLabel":{"editor":null},"axes":{"editor":null},"score":{"editor":null},"h":{"editor":null},"editable":{"editor":null},"tagHits":{"editor":null},"drag":{"editor":null},"win":{"editor":null},"opacity":{"editor":null},"panel":{"editor":null},"stroke":{"editor":null},"loading":{"editor":null},"loadingText":{"editor":null},"$preview":{"width":1200,"height":560}}'>
+class Component extends DCLogic {
+  palette() {
+    if (this.props.theme === 'arcade') {
+      return {
+        font: "'Space Grotesk', system-ui, sans-serif", mono: "'Space Mono', monospace",
+        text: '#F4F1FF', tick: '#A9A2D4', grid: '#1F1B45', panel: '#07061A', strip: '#100E28', btn: '#2C2754',
+        stroke: '#ECE8FF',
+        player: '#FF3D9A', playerFill: 'rgba(255, 61, 154, 0.17)', playerInk: '#1A0612',
+        det: '#22D3EE', detFill: 'rgba(34, 211, 238, 0.13)', detArea: 'rgba(34, 211, 238, 0.28)',
+        truthFill: 'rgba(255, 225, 77, 0.13)', truthEdge: 'rgba(255, 225, 77, 0.8)', truthChip: '#FFE14D', truthInk: '#1C1500',
+        soft: { playerFill: 'rgba(255, 61, 154, 0.07)', playerEdge: 'rgba(255, 61, 154, 0.55)', detFill: 'rgba(34, 211, 238, 0.05)', truthFill: 'rgba(255, 225, 77, 0.07)', truthEdge: 'rgba(255, 225, 77, 0.55)', tagBg: 'rgba(7, 6, 26, 0.85)', tagInk: '#FF8CC4' },
+        win: '#FFE14D', winFill: 'rgba(255, 225, 77, 0.08)',
+      };
+    }
+    return {
+      font: "'IBM Plex Sans', system-ui, sans-serif", mono: "'IBM Plex Mono', monospace",
+      text: '#E8EAEE', tick: '#858E9E', grid: '#1D232D', panel: '#141820', strip: '#141820', btn: '#2A303B',
+      stroke: '#D5DBE4',
+      player: '#F5A524', playerFill: 'rgba(245, 165, 36, 0.16)', playerInk: '#1A1205',
+      det: '#4EA8F5', detFill: 'rgba(78, 168, 245, 0.13)', detArea: 'rgba(78, 168, 245, 0.28)',
+      truthFill: 'rgba(232, 234, 238, 0.11)', truthEdge: 'rgba(232, 234, 238, 0.6)', truthChip: '#2A303B', truthInk: '#E8EAEE',
+      soft: { playerFill: 'rgba(245, 165, 36, 0.08)', playerEdge: 'rgba(245, 165, 36, 0.6)', detFill: 'rgba(78, 168, 245, 0.06)', truthFill: 'rgba(232, 234, 238, 0.07)', truthEdge: 'rgba(232, 234, 238, 0.45)', tagBg: 'rgba(20, 24, 32, 0.85)', tagInk: '#F7C46E' },
+      win: '#C9D1DB', winFill: 'rgba(232, 234, 238, 0.06)',
+    };
+  }
+
+  series() {
+    const p = this.props;
+    const n = Math.max(50, Number(p.n ?? 4800));
+    const seed = Number(p.seed ?? 14);
+    const kind = p.kind ?? 'freq';
+    const an = p.anomaly ?? [0.52, 0.58];
+    const per = Number(p.period ?? 140);
+    const key = [n, seed, kind, an.join(','), per].join('|');
+    if (this._key === key) return this._s;
+    let s = (seed * 2654435761) >>> 0 || 1;
+    const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+    const ai = Math.round(an[0] * (n - 1));
+    const bi = Math.round(an[1] * (n - 1));
+    const v = new Array(n);
+    let ph = rnd() * 6.28, drift = 0, ar = 0;
+    for (let i = 0; i < n; i++) {
+      const inA = kind !== 'none' && i >= ai && i <= bi;
+      ph += 2 * Math.PI * ((kind === 'freq' && inA) ? 1.55 : 1) / per;
+      drift = drift * 0.998 + (rnd() - 0.5) * 0.03;
+      ar = ar * 0.6 + (rnd() - 0.5) * 0.3;
+      let y = Math.sin(ph) + 0.32 * Math.sin(ph * 3 + 0.7) + drift + ar;
+      if (kind === 'shift' && inA) y += 0.6;
+      if (kind === 'point' && i === ai) y += 2.6;
+      v[i] = 40 + 9 * y;
+    }
+    this._key = key;
+    this._s = { v, n, kind, an, seed };
+    return this._s;
+  }
+
+  renderVals() {
+    const p = this.props;
+    const k = this.palette();
+    const { v, n, kind, an, seed } = this.series();
+    const view = p.view ?? [0, 1];
+    const v0 = Math.max(0, view[0]), v1 = Math.min(1, view[1]);
+    const span = v1 - v0;
+    const i0 = Math.floor(v0 * (n - 1));
+    const i1 = Math.max(i0 + 1, Math.ceil(v1 * (n - 1)));
+    let lo = Infinity, hi = -Infinity;
+    for (let i = i0; i <= i1; i++) { if (v[i] < lo) lo = v[i]; if (v[i] > hi) hi = v[i]; }
+    const pad = (hi - lo) * 0.08 || 1;
+    lo -= pad; hi += pad;
+    const yOf = (y) => ((hi - y) / (hi - lo) * 100).toFixed(2);
+    const xOf = (i) => ((i - i0) / (i1 - i0) * 1000).toFixed(1);
+    const m = i1 - i0 + 1, B = 900, pts = [];
+    if (m <= B * 2) {
+      for (let i = i0; i <= i1; i++) pts.push(xOf(i) + ',' + yOf(v[i]));
+    } else {
+      const step = m / B;
+      for (let q = 0; q < B; q++) {
+        const a = i0 + Math.floor(q * step), b = Math.min(i1, i0 + Math.floor((q + 1) * step) - 1);
+        let mi = a, ma = a;
+        for (let i = a; i <= b; i++) { if (v[i] < v[mi]) mi = i; if (v[i] > v[ma]) ma = i; }
+        const f = mi < ma ? [mi, ma] : [ma, mi];
+        pts.push(xOf(f[0]) + ',' + yOf(v[f[0]]));
+        if (f[1] !== f[0]) pts.push(xOf(f[1]) + ',' + yOf(v[f[1]]));
+      }
+    }
+
+    const raw = (hi - lo) / 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const stepY = [1, 2, 2.5, 5, 10].map((x) => x * mag).find((x) => x >= raw) || raw;
+    const yticks = [];
+    for (let y = Math.ceil(lo / stepY) * stepY; y <= hi; y += stepY) {
+      yticks.push({ label: String(+y.toFixed(2)), top: yOf(y) });
+    }
+    const xticks = [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => ({
+      left: (f * 100).toFixed(2),
+      shift: f === 0 ? 0 : f === 1 ? -100 : -50,
+      label: Math.round(i0 + f * (i1 - i0)).toLocaleString('en-US'),
+    }));
+
+    const place = (r) => {
+      const a = (r[0] - v0) / span * 100, b = (r[1] - v0) / span * 100;
+      if (b < 0 || a > 100) return null;
+      const L = Math.max(0, a), R = Math.min(100, b);
+      return { left: L.toFixed(3), width: Math.max(0, R - L).toFixed(3) };
+    };
+    const hasTruth = kind !== 'none';
+    const overlaps = (r) => hasTruth && r[0] <= an[1] && r[1] >= an[0];
+    const truthOn = (p.truth ?? true) && hasTruth;
+    const truthBands = truthOn ? [place(an)].filter(Boolean).map((b) => ({ ...b, labelled: p.axes ?? true, label: p.truthLabel ?? 'Labeled anomaly' })) : [];
+    const playerBands = (p.player ?? [[0.53, 0.585], [0.27, 0.3]]).map((r, j) => {
+      const b = place(r);
+      if (!b) return null;
+      const tag = (p.tagHits ?? true) ? (j + 1) + (overlaps(r) ? ' · hit' : ' · false alarm') : String(j + 1);
+      return { ...b, num: j + 1, tag };
+    }).filter(Boolean);
+    const detList = p.det ?? [[0.31, 0.34], [0.8, 0.83]];
+    const detBands = detList.map(place).filter(Boolean);
+    const dragBands = p.drag ? [place(p.drag)].filter(Boolean) : [];
+    const winBands = p.win ? [place(p.win)].filter(Boolean) : [];
+
+    const S = 260, sp = ['M0,100'];
+    for (let q = 0; q <= S; q++) {
+      const t = v0 + span * q / S;
+      let y = 0.16 + 0.07 * (Math.sin(t * 173 + seed) + Math.sin(t * 61.3 + seed * 2) + 0.6 * Math.sin(t * 517 + seed));
+      detList.forEach((r) => {
+        const c = (r[0] + r[1]) / 2, w = Math.max((r[1] - r[0]) / 2, 0.004);
+        y += 0.72 * Math.exp(-Math.pow((t - c) / (w * 1.4), 2));
+      });
+      y = Math.min(0.96, Math.max(0.03, y));
+      sp.push('L' + (q / S * 1000).toFixed(1) + ',' + ((1 - y) * 100).toFixed(1));
+    }
+    sp.push('L1000,100 Z');
+
+    const axes = p.axes ?? true;
+    const editable = p.editable ?? false;
+    const soft = editable
+      ? { playerFill: k.playerFill, playerEdge: k.player, detFill: k.detFill, truthFill: k.truthFill, truthEdge: k.truthEdge, tagBg: k.player, tagInk: k.playerInk, edge: 2, bar: 6, barOpacity: 1 }
+      : { ...k.soft, edge: 1, bar: 4, barOpacity: 0.8 };
+    return {
+      k, m: soft,
+      pts: pts.join(' '),
+      sw: p.h && p.h < 90 ? 1 : 1.25,
+      yticks, xticks, truthBands, playerBands, detBands, dragBands, winBands,
+      scorePath: sp.join(' '),
+      axes, showX: axes,
+      pl: axes ? 56 : 0,
+      pr: axes ? 16 : 0,
+      pt: axes ? 14 : 4,
+      h: p.h ?? 380,
+      score: p.score ?? true,
+      editable: p.editable ?? false,
+      opacity: p.opacity ?? 1,
+      panel: p.panel ?? k.panel,
+      stroke: p.stroke ?? k.stroke,
+      loading: p.loading ?? false,
+      loadingText: p.loadingText ?? 'Loading series',
+    };
+  }
+}
+</script>
+</body>
+</html>

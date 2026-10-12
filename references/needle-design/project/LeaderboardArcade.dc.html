@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Needle · Leaderboard, arcade</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&amp;family=Space+Grotesk:wght@400;500;700&amp;family=Space+Mono:wght@400;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0B0A1F}
+</style>
+</helmet>
+<div style="min-height: 100vh; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; padding: 28px 32px 32px; background-color: #0B0A1F; background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px); background-size: 24px 24px; color: #F4F1FF; font-family: 'Space Grotesk', system-ui, sans-serif">
+
+  <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke-width: 1.8px; stroke-linecap: round; stroke-linejoin: round"><path d="M2 15 L6 13 L9 16 L12 9 L15 14 L18 12 L22 13" style="stroke: #22D3EE"></path><path d="M12 2 L12 22" style="stroke: #FF3D9A"></path></svg>
+      <span style="font-family: 'Bungee', sans-serif; font-size: 24px">NEEDLE</span>
+    </div>
+    <h1 style="margin: 0; font-family: 'Bungee', 'Space Grotesk', sans-serif; font-weight: 400; font-size: clamp(2.6rem, 6vw, 4.5rem); line-height: 0.95; text-shadow: -4px 0 0 #22D3EE, 4px 0 0 #FF3D9A">HIGH SCORES</h1>
+    <span style="font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #FFE14D">Today · ICDE 2027</span>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch; flex: 1">
+    <section aria-label="Leaderboard" style="flex: 999 1 640px; min-width: 0; border-radius: 18px; border: 3px solid #2C2754; background: #07061A; box-shadow: 0 0 0 6px #120F2B; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px">
+      <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 190px 70px; gap: 14px; padding: 0 12px 8px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #A9A2D4">
+        <span>Rank</span><span>Name</span><span>Series vs detectors</span><span style="text-align: right">Score</span>
+      </div>
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+        <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 190px 70px; gap: 14px; align-items: center; min-height: 48px; padding: 0 12px; border-radius: 8px; background: {{r.bg}}; border: 2px solid {{r.border}}; box-shadow: {{r.glow}}">
+          <span style="font-family: 'Bungee', sans-serif; font-size: 18px; color: {{r.rankColor}}">{{r.rank}}</span>
+          <span style="display: flex; align-items: center; gap: 10px; min-width: 0">
+            <span style="font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: {{r.nameColor}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</span>
+            <sc-if value="{{r.isNew}}" hint-placeholder-val="{{ false }}">
+              <span style="font-family: 'Bungee', sans-serif; font-size: 11px; padding: 3px 7px; border-radius: 3px; background: #FFE14D; color: #1C1500">YOU · NEW</span>
+            </sc-if>
+            <sc-if value="{{r.isRef}}" hint-placeholder-val="{{ false }}">
+              <span style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A5F3FC">reference · avg per round</span>
+            </sc-if>
+          </span>
+          <span style="display: flex; gap: 6px; align-items: center">
+            <sc-for list="{{r.pips}}" as="p" hint-placeholder-count="6">
+              <span style="width: 12px; height: 12px; transform: rotate(45deg); box-sizing: border-box; background: {{p.bg}}; border: 2px solid {{p.border}}"></span>
+            </sc-for>
+          </span>
+          <span style="font-family: 'Bungee', sans-serif; font-size: 26px; text-align: right; color: {{r.scoreColor}}">{{r.score}}</span>
+        </div>
+      </sc-for>
+      <sc-if value="{{empty}}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top: 10px; padding: 18px; border-radius: 10px; border: 2px dashed #3B3566; text-align: center; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-family: 'Bungee', sans-serif; font-size: 22px; color: #FFE14D">NO SCORES YET</span>
+          <span style="font-size: 16px; color: #C9C3E6">The detectors are waiting. Be the first to beat them.</span>
+        </div>
+      </sc-if>
+      <div style="margin-top: auto; padding: 12px 12px 0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #A9A2D4">
+        <span style="display: inline-flex; align-items: center; gap: 7px"><span style="width: 10px; height: 10px; transform: rotate(45deg); background: #FF3D9A"></span>won</span>
+        <span style="display: inline-flex; align-items: center; gap: 7px"><span style="width: 10px; height: 10px; transform: rotate(45deg); box-sizing: border-box; border: 2px solid #C9C3E6"></span>tie</span>
+        <span style="display: inline-flex; align-items: center; gap: 7px"><span style="width: 10px; height: 10px; transform: rotate(45deg); background: #22D3EE"></span>detectors won</span>
+      </div>
+    </section>
+
+    <aside style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 18px">
+      <section style="border-radius: 14px; background: #15132E; border: 1px solid #2C2754; padding: 22px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #A9A2D4">Humans vs detectors</h2>
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: 'Bungee', sans-serif; font-size: 64px; line-height: 1; color: #FF3D9A; text-shadow: 0 0 24px rgba(255, 61, 154, 0.45)">[X]%</span>
+          <span style="font-size: 17px; line-height: 1.4; color: #F4F1FF">of the anomalies the detectors missed were found by a human.</span>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap">
+          <span style="font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; padding: 6px 10px; border-radius: 6px; background: #0B0A1F; color: #FFE14D">[N] plays</span>
+          <span style="font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; padding: 6px 10px; border-radius: 6px; background: #0B0A1F; color: #F4F1FF">6 series a round</span>
+        </div>
+        <div aria-hidden="true" style="filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.7))">
+          <dc-import name="Chart" theme="arcade" seed="{{s.seed}}" n="{{s.n}}" kind="{{s.kind}}" anomaly="{{s.anomaly}}" player="{{s.none}}" det="{{s.none}}" truth="{{s.off}}" axes="{{s.off}}" score="{{s.off}}" h="{{s.h}}" panel="transparent" stroke="#22D3EE" hint-size="100%,90px"></dc-import>
+        </div>
+      </section>
+
+      <section style="border-radius: 14px; background: #15132E; border: 2px solid #FFE14D; box-shadow: 0 0 28px rgba(255, 225, 77, 0.18); padding: 22px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; text-align: center">
+        <span style="font-family: 'Bungee', sans-serif; font-size: 24px; line-height: 1.15">CAN YOU FIND WHAT THE DETECTORS CANNOT?</span>
+        <button type="button" style="height: 64px; border-radius: 8px; border: 0; background: #FFE14D; color: #1C1500; font-family: 'Bungee', sans-serif; font-size: 26px; box-shadow: 0 6px 0 #B89A0E; cursor: pointer">PRESS PLAY</button>
+        <span style="font-size: 14px; color: #C9C3E6">Two minutes. No account. Plays are logged anonymously.</span>
+      </section>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"empty":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const empty = !!this.props.empty;
+    const pip = { W: { bg: '#FF3D9A', border: '#FF3D9A' }, T: { bg: 'transparent', border: '#C9C3E6' }, L: { bg: '#22D3EE', border: '#22D3EE' }, _: { bg: 'transparent', border: '#2C2754' } };
+    const ord = ['1ST', '2ND', '3RD', '4TH', '5TH', '6TH', '7TH', '8TH'];
+    const players = empty ? [] : [
+      { name: 'NEEDLEFAN', score: 6, res: 'WWTWTW' },
+      { name: 'OUTLIER', score: 5, res: 'TWWTLW' },
+      { name: '[NAME]', score: 4, res: 'TTWLWT', isNew: true },
+      { name: 'PVALUE', score: 4, res: 'TWTWLT' },
+      { name: 'SPIKY', score: 2, res: 'TLTWLT' },
+      { name: 'ZSCORE', score: 1, res: 'LTLTWL' },
+    ];
+    const ref = { name: 'DETECTORS', score: 3, isRef: true };
+    const list = [];
+    let placed = false, k = 0;
+    players.forEach((p) => {
+      if (!placed && p.score < ref.score) { list.push(ref); placed = true; }
+      list.push({ ...p, rank: ord[k++] });
+    });
+    if (!placed) list.push(ref);
+    while (list.length < 8) list.push({ name: '---', score: 0, rank: ord[k++] || '', blank: true });
+    const rows = list.slice(0, 8).map((r) => {
+      if (r.isRef) {
+        return {
+          rank: 'REF', name: r.name, score: String(r.score), isRef: true, isNew: false, pips: [],
+          bg: 'rgba(34, 211, 238, 0.08)', border: '#22D3EE', glow: 'none',
+          rankColor: '#22D3EE', nameColor: '#22D3EE', scoreColor: '#22D3EE',
+        };
+      }
+      return {
+        rank: r.rank, name: r.name, score: r.blank ? '00' : String(r.score), isRef: false, isNew: !!r.isNew,
+        pips: (r.res || '______').split('').map((c) => pip[c]),
+        bg: r.isNew ? 'rgba(255, 61, 154, 0.12)' : 'transparent',
+        border: r.isNew ? '#FF3D9A' : 'transparent',
+        glow: r.isNew ? '0 0 22px rgba(255, 61, 154, 0.35)' : 'none',
+        rankColor: r.blank ? '#3B3566' : '#FFE14D',
+        nameColor: r.blank ? '#3B3566' : '#F4F1FF',
+        scoreColor: r.blank ? '#3B3566' : '#FF3D9A',
+      };
+    });
+    return {
+      empty, rows,
+      s: { seed: 5, n: 6000, kind: 'freq', anomaly: [0.62, 0.68], none: [], off: false, h: 90 },
+    };
+  }
+}
+</script>
+</body>
+</html>

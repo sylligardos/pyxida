@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Needle · Round</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0D1015}
+</style>
+</helmet>
+<div style="min-height: 100vh; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; background: #0D1015; color: #E8EAEE; font-family: 'IBM Plex Sans', system-ui, sans-serif">
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; padding: 16px 32px; border-bottom: 1px solid #1D232D">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke-width: 1.6px; stroke-linecap: round; stroke-linejoin: round"><path d="M2 15 L6 13 L9 16 L12 9 L15 14 L18 12 L22 13" style="stroke: #9AA3B2"></path><path d="M12 2 L12 22" style="stroke: #F5A524"></path></svg>
+      <span style="font-weight: 600; font-size: 17px">Needle</span>
+    </div>
+    <div aria-label="Series 3 of 6" style="display: flex; align-items: center; gap: 12px">
+      <div style="display: flex; gap: 4px">
+        <sc-for list="{{segments}}" as="s" hint-placeholder-count="6">
+          <div style="width: 40px; height: 4px; border-radius: 2px; background: {{s.bg}}"></div>
+        </sc-for>
+      </div>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #D5DBE4">3 of 6</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #9AA3B2">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 1.5px; stroke-linecap: round"><circle cx="8" cy="8" r="6.5"></circle><path d="M8 4.5 V8 L10.5 9.5"></path></svg>
+      <span>{{elapsed}}</span>
+    </div>
+  </header>
+
+  <main style="flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; box-sizing: border-box; padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap">
+      <div style="display: flex; align-items: baseline; gap: 14px">
+        <h1 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 500">{{seriesId}}</h1>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #9AA3B2">{{pointsText}}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap">
+        <span style="font-size: 13px; color: #858E9E">Scroll to zoom · drag the axis to pan</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9AA3B2; padding: 4px 8px; border-radius: 4px; background: #141820">{{zoomText}}</span>
+        <button type="button" style="height: 34px; padding: 0 14px; border-radius: 6px; border: 1px solid #2E3542; background: transparent; color: #D5DBE4; font-family: inherit; font-size: 13px; cursor: pointer">Reset view</button>
+      </div>
+    </div>
+
+    <dc-import name="Chart" seed="{{c.seed}}" n="{{c.n}}" kind="{{c.kind}}" anomaly="{{c.anomaly}}" view="{{c.view}}" player="{{c.player}}" det="{{c.none}}" truth="{{c.off}}" axes="{{c.on}}" score="{{c.off}}" h="{{c.h}}" editable="{{c.on}}" tag-hits="{{c.off}}" drag="{{c.drag}}" loading="{{loading}}" loading-text="{{loadingText}}" hint-size="100%,490px"></dc-import>
+
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="width: 44px; flex: none; font-size: 11px; color: #858E9E; text-align: right">Whole</span>
+      <div style="flex: 1; min-width: 0">
+        <dc-import name="Chart" seed="{{c.seed}}" n="{{c.n}}" kind="{{c.kind}}" anomaly="{{c.anomaly}}" player="{{c.none}}" det="{{c.none}}" truth="{{c.off}}" axes="{{c.off}}" score="{{c.off}}" h="{{c.oh}}" win="{{c.win}}" stroke="#6B7383" loading="{{loading}}" loading-text="" hint-size="100%,44px"></dc-import>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; padding-top: 8px">
+      <div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 420px; min-width: 0">
+        <p style="margin: 0; font-size: 17px; color: {{hintColor}}">{{hint}}</p>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: #9AA3B2; margin-right: 4px">{{countText}}</span>
+          <sc-for list="{{chips}}" as="r" hint-placeholder-count="2">
+            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid #5A4520; background: rgba(245, 165, 36, 0.10); font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #F7C46E">{{r.label}}</span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap">
+        <button type="button" style="height: 52px; padding: 0 24px; border-radius: 8px; border: 1px solid #2E3542; background: #141820; color: #E8EAEE; font-family: inherit; font-size: 16px; font-weight: 500; cursor: pointer">Nothing here</button>
+        <sc-if value="{{canSubmit}}" hint-placeholder-val="{{ true }}">
+          <button type="button" style="height: 52px; padding: 0 36px; border-radius: 8px; border: 0; background: #F5A524; color: #1A1205; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Submit</button>
+        </sc-if>
+        <sc-if value="{{cannotSubmit}}" hint-placeholder-val="{{ false }}">
+          <button type="button" disabled style="height: 52px; padding: 0 36px; border-radius: 8px; border: 1px solid #2E3542; background: transparent; color: #6B7383; font-family: inherit; font-size: 16px; font-weight: 600; cursor: not-allowed">Submit</button>
+        </sc-if>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"marks":{"editor":"int","min":0,"max":5,"default":2},"loading":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const n = 4800;
+    const loading = !!p.loading;
+    const marks = loading ? 0 : Math.max(0, Math.min(5, Number(p.marks ?? 2)));
+    const preset = [[0.535, 0.588], [0.268, 0.297], [0.655, 0.664], [0.402, 0.428], [0.712, 0.741]];
+    const player = preset.slice(0, marks);
+    const view = loading ? [0, 1] : [0.18, 0.78];
+    const fmt = (f) => Math.round(f * (n - 1)).toLocaleString('en-US');
+    const full = marks >= 5;
+    let hint = 'Drag over the regions you think are anomalous.';
+    let hintColor = '#E8EAEE';
+    if (loading) { hint = 'Getting the next series ready.'; hintColor = '#9AA3B2'; }
+    else if (marks === 0) hint = 'Drag over the regions you think are anomalous. If nothing looks off, choose Nothing here.';
+    else if (full) { hint = 'Five ranges is the limit. Remove one to mark another.'; hintColor = '#F7C46E'; }
+    return {
+      segments: [0, 1, 2, 3, 4, 5].map((k) => ({ bg: k < 2 ? '#4A5363' : k === 2 ? '#F5A524' : '#232934' })),
+      elapsed: loading ? '00:00' : '00:48',
+      seriesId: loading ? 'Series 15' : 'Series 14',
+      pointsText: loading ? '6,200 points' : n.toLocaleString('en-US') + ' points',
+      zoomText: loading ? '100%' : 'Showing 864 to 3,743',
+      loading,
+      loadingText: 'Loading Series 15 · 6,200 points',
+      hint, hintColor,
+      countText: loading ? '' : marks + ' of 5 ranges',
+      chips: player.map((r, k) => ({ label: (k + 1) + ' · ' + fmt(r[0]) + ' to ' + fmt(r[1]) })),
+      canSubmit: !loading && marks > 0,
+      cannotSubmit: loading || marks === 0,
+      c: {
+        seed: 14, n, kind: 'freq', anomaly: [0.52, 0.58],
+        view, player, none: [], on: true, off: false,
+        h: 460, oh: 44, win: view,
+        drag: marks === 2 ? [0.452, 0.47] : null,
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

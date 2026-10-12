@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Needle · Round, arcade</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&amp;family=Space+Grotesk:wght@400;500;700&amp;family=Space+Mono:wght@400;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#0B0A1F}
+</style>
+</helmet>
+<div style="min-height: 100vh; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 20px 32px 28px; background: #0B0A1F; color: #F4F1FF; font-family: 'Space Grotesk', system-ui, sans-serif">
+
+  <header style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 16px">
+    <div style="display: flex; align-items: center; gap: 14px">
+      <span style="padding: 4px 9px; border-radius: 4px; background: #FF3D9A; color: #1A0612; font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700">1P</span>
+      <div style="display: flex; flex-direction: column; gap: 0">
+        <span style="font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #FFB8D9">{{nick}}</span>
+        <span style="font-family: 'Bungee', sans-serif; font-size: 30px; line-height: 1; color: #FF3D9A">{{youScore}}</span>
+      </div>
+    </div>
+    <div aria-label="Series 3 of 6" style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+      <span style="font-family: 'Bungee', sans-serif; font-size: 18px; letter-spacing: 0.04em; color: #FFE14D">SERIES 3 / 6</span>
+      <div style="display: flex; gap: 8px">
+        <sc-for list="{{pips}}" as="s" hint-placeholder-count="6">
+          <span style="width: 12px; height: 12px; transform: rotate(45deg); box-sizing: border-box; background: {{s.bg}}; border: 2px solid {{s.border}}; box-shadow: {{s.glow}}"></span>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 14px">
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0">
+        <span style="font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #A5F3FC">Detectors</span>
+        <span style="font-family: 'Bungee', sans-serif; font-size: 30px; line-height: 1; color: #22D3EE">{{cpuScore}}</span>
+      </div>
+      <span style="padding: 6px 10px; border-radius: 6px; border: 1px solid #3B3566; font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; color: #F4F1FF">{{elapsed}}</span>
+    </div>
+  </header>
+
+  <section style="position: relative; border-radius: 18px; border: 3px solid #2C2754; background: #07061A; box-shadow: inset 0 0 80px rgba(34, 211, 238, 0.07), 0 0 0 6px #120F2B; padding: 16px 18px 14px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; position: relative; z-index: 2">
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <h1 style="margin: 0; font-family: 'Bungee', sans-serif; font-weight: 400; font-size: 20px; letter-spacing: 0.03em">{{seriesId}}</h1>
+        <span style="font-family: 'Space Mono', monospace; font-size: 13px; color: #A9A2D4">{{pointsText}}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <span style="font-size: 13px; color: #A9A2D4">Scroll to zoom · drag the axis to pan</span>
+        <span style="font-family: 'Space Mono', monospace; font-size: 12px; color: #FFE14D; padding: 4px 8px; border-radius: 4px; background: #15132E">{{zoomText}}</span>
+        <button type="button" style="height: 34px; padding: 0 14px; border-radius: 6px; border: 1px solid #3B3566; background: transparent; color: #F4F1FF; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer">Reset view</button>
+      </div>
+    </div>
+
+    <dc-import name="Chart" theme="arcade" seed="{{c.seed}}" n="{{c.n}}" kind="{{c.kind}}" anomaly="{{c.anomaly}}" view="{{c.view}}" player="{{c.player}}" det="{{c.none}}" truth="{{c.off}}" axes="{{c.on}}" score="{{c.off}}" h="{{c.h}}" editable="{{c.on}}" tag-hits="{{c.off}}" drag="{{c.drag}}" loading="{{loading}}" loading-text="{{loadingText}}" hint-size="100%,470px"></dc-import>
+
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="width: 44px; flex: none; font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A9A2D4; text-align: right">Map</span>
+      <div style="flex: 1; min-width: 0">
+        <dc-import name="Chart" theme="arcade" seed="{{c.seed}}" n="{{c.n}}" kind="{{c.kind}}" anomaly="{{c.anomaly}}" player="{{c.none}}" det="{{c.none}}" truth="{{c.off}}" axes="{{c.off}}" score="{{c.off}}" h="{{c.oh}}" win="{{c.win}}" panel="#100E28" stroke="#7D76AE" loading="{{loading}}" loading-text="" hint-size="100%,40px"></dc-import>
+      </div>
+    </div>
+
+    <div aria-hidden="true" style="position: absolute; inset: 0; z-index: 3; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 0, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 4px)"></div>
+  </section>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 18px 32px; flex-wrap: wrap">
+    <div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 460px; min-width: 0">
+      <p style="margin: 0; font-family: 'Bungee', sans-serif; font-size: 22px; letter-spacing: 0.02em; color: {{hintColor}}">{{hint}}</p>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <span style="font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #A9A2D4">Ranges</span>
+        <div style="display: flex; gap: 6px">
+          <sc-for list="{{slots}}" as="s" hint-placeholder-count="5">
+            <span style="width: 30px; height: 30px; box-sizing: border-box; border-radius: 6px; border: 2px {{s.style}} {{s.border}}; background: {{s.bg}}; color: #1A0612; font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{s.label}}</span>
+          </sc-for>
+        </div>
+        <span style="font-size: 14px; color: #C9C3E6">{{subHint}}</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center">
+      <button type="button" style="height: 58px; padding: 0 26px; border-radius: 8px; border: 2px solid #F4F1FF; background: transparent; color: #F4F1FF; font-family: 'Bungee', sans-serif; font-size: 17px; letter-spacing: 0.03em; cursor: pointer">NOTHING HERE</button>
+      <sc-if value="{{canSubmit}}" hint-placeholder-val="{{ true }}">
+        <button type="button" style="height: 58px; padding: 0 40px; border-radius: 8px; border: 0; background: #FFE14D; color: #1C1500; font-family: 'Bungee', sans-serif; font-size: 22px; letter-spacing: 0.04em; box-shadow: 0 6px 0 #B89A0E; cursor: pointer">SUBMIT</button>
+      </sc-if>
+      <sc-if value="{{cannotSubmit}}" hint-placeholder-val="{{ false }}">
+        <button type="button" disabled style="height: 58px; padding: 0 40px; border-radius: 8px; border: 2px solid #3B3566; background: transparent; color: #6E679A; font-family: 'Bungee', sans-serif; font-size: 22px; letter-spacing: 0.04em; cursor: not-allowed">SUBMIT</button>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"marks":{"editor":"int","min":0,"max":5,"default":2},"loading":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const n = 4800;
+    const loading = !!p.loading;
+    const marks = loading ? 0 : Math.max(0, Math.min(5, Number(p.marks ?? 2)));
+    const preset = [[0.535, 0.588], [0.268, 0.297], [0.655, 0.664], [0.402, 0.428], [0.712, 0.741]];
+    const player = preset.slice(0, marks);
+    const view = loading ? [0, 1] : [0.18, 0.78];
+    const full = marks >= 5;
+    let hint = 'DRAG OVER WHAT LOOKS WRONG';
+    let hintColor = '#F4F1FF';
+    let subHint = 'Zoom in to catch single points.';
+    if (loading) { hint = 'GET READY'; hintColor = '#FFE14D'; subHint = 'Next series incoming.'; }
+    else if (marks === 0) subHint = 'Nothing off? Hit Nothing here.';
+    else if (full) { hint = 'OUT OF RANGES'; hintColor = '#FFE14D'; subHint = 'Remove one to mark another.'; }
+    else subHint = (5 - marks) + ' left. Zoom in to catch single points.';
+    return {
+      nick: '[NAME]',
+      youScore: '2',
+      cpuScore: '1',
+      elapsed: loading ? '00:00' : '00:48',
+      pips: [0, 1, 2, 3, 4, 5].map((k) => k < 2
+        ? { bg: '#7D76AE', border: '#7D76AE', glow: 'none' }
+        : k === 2
+          ? { bg: '#FFE14D', border: '#FFE14D', glow: '0 0 10px rgba(255, 225, 77, 0.7)' }
+          : { bg: 'transparent', border: '#3B3566', glow: 'none' }),
+      seriesId: loading ? 'SERIES 15' : 'SERIES 14',
+      pointsText: loading ? '6,200 pts' : '4,800 pts',
+      zoomText: loading ? '100%' : '864 to 3,743',
+      loading,
+      loadingText: 'Loading Series 15 · 6,200 points',
+      hint, hintColor, subHint,
+      slots: [0, 1, 2, 3, 4].map((k) => k < marks
+        ? { label: String(k + 1), bg: '#FF3D9A', border: '#FF3D9A', style: 'solid' }
+        : { label: '', bg: 'transparent', border: '#3B3566', style: 'dashed' }),
+      canSubmit: !loading && marks > 0,
+      cannotSubmit: loading || marks === 0,
+      c: {
+        seed: 14, n, kind: 'freq', anomaly: [0.52, 0.58],
+        view, player, none: [], on: true, off: false,
+        h: 440, oh: 40, win: view,
+        drag: marks === 2 ? [0.452, 0.47] : null,
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>
