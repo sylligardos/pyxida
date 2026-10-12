@@ -1,169 +1,99 @@
-# TSB-AD
+# Pyxida
 
-Python parser for the **TSB-AD** benchmark (Time Series Benchmark for Anomaly Detection), a large-scale evaluation suite for time series anomaly detection published at NeurIPS 2024.
+The demo behind the ICDE 2027 submission *Pyxida*: an interactive tour of a
+time-series anomaly detection benchmark (which datasets and anomaly types are
+still open, and what the detectors actually did on any one series), and
+**Needle**, the booth game where a person marks anomalies against a team of
+detectors.
 
-## What is TSB-AD?
+It runs on TSB-AD out of the box, and on any data in the format below.
 
-TSB-AD ships with:
-
-- **Raw time series** with ground-truth anomaly labels
-- **Pre-computed anomaly scores** for 30+ detectors
-- **Evaluation metrics** (VUS-PR, AUC-ROC, etc.) per detector and series
-- **Runtime** measurements per detector
-- **Official train/eval/label splits**
-
-Both **univariate** (`uni`) and **multivariate** (`multi`) variants are included.
-
-See the [official TSB-AD repository](https://github.com/thedatumorg/TSB-AD) for the full benchmark description and data downloads.
-
-This repo provides:
-
-- A **Python parser** (`tsbadparser`) for loading time series, scores, metrics, and splits
-- An **interactive Streamlit explorer app** for inspecting results, comparing detectors, and browsing anomalies
-
-```bash
-streamlit run src/app/explorer.py
-```
-
-## Repository layout
+## Layout
 
 ```
-tsb-ad-parser/
-├── data/
-│   ├── raw/uni|multi/                    # Raw time series CSVs (values + label column)  [gitignored]
-│   ├── scores/uni|multi/                 # Per-detector .npy score files                 [gitignored]
-│   ├── metrics/uni|multi/                # Per-detector metric CSVs                      [gitignored]
-│   ├── runtime/uni|multi/                # Per-detector runtime CSVs                     [gitignored]
-│   ├── splits/                           # Official TSB-AD splits: {U,M}-{Eval,Label}.csv
-│   ├── anomaly_features_uni.parquet      # Precomputed anomaly features (uni)            [gitignored]
-│   └── anomaly_features_multi.parquet    # Precomputed anomaly features (multi)          [gitignored]
-├── src/
-│   ├── app/                              # Streamlit explorer app
-│   │   ├── explorer.py                   # Entry point
-│   │   ├── precompute.py                 # One-time feature precomputation
-│   │   ├── utils.py                      # Shared helpers and plot utilities
-│   │   └── pages/
-│   │       ├── global_summary.py         # Benchmark-wide performance overview
-│   │       ├── edge_cases.py             # Hardest / easiest series viewer
-│   │       ├── series_browser.py         # Random sampling + saved-series review
-│   │       └── anomaly_clusters.py       # Per-anomaly clustering and inspection
-│   └── tsbadparser/                      # The parser package
-├── tests/                                # Parser unit tests
-├── saved_series.json                     # User-bookmarked series
-├── environment.yml                       # Conda environment
-└── pyproject.toml                        # Makes tsbadparser pip-installable
+pyxida/
+├── app/            the demo (Streamlit): main.py, pages/, lib.py
+│   ├── parser.py   reads a benchmark in the data format
+│   └── convert/    converters into the format (TSB-UAD, TAB, TimeEval, mTSBench)
+├── game/           Needle, the booth game (Starlette + vanilla JS); see game/README.md
+├── scripts/        produce the data: run detectors, compute metrics, build the summary
+├── data/           the data, in the format (links into the benchmarks root; see below)
+├── tests/
+└── archive/        earlier work, kept but not maintained; see archive/README.md
 ```
 
-The bulk of the data (raw/, scores/, metrics/, runtime/) lives outside the repo, in the benchmarks root (`$TSAD_BENCHMARKS`, default `~/Documents/tsad-benchmarks`), and `data/` links to its `tsb-ad/` folder. Only the split CSVs are tracked. Other benchmarks converted to the same format (TSB-UAD, TAB, TimeEval; converters in `src/convert/`) load by name: `TSBADParser(benchmark="tab", kind="uni")`. See `data/README.md`.
-
-## Setup
-
-### 1. Clone this repo
-
-```bash
-git clone https://github.com/sylligardos/tsb-ad-parser.git
-cd tsb_ad_parser
-```
-
-### 2. Download the benchmark data
-
-Download the data from the [official TSB-AD repository](https://github.com/thedatumorg/TSB-AD) and place the files under `data/` following the structure above.
-
-### 3. Create the environment
+## Run
 
 ```bash
 conda env create -f environment.yml
 conda activate tsbad
+
+streamlit run app/main.py          # the demo, http://localhost:8501
+python game/make_dev_pack.py       # once: a synthetic pack for Needle
+python game/server.py              # the game, http://localhost:8000
 ```
 
-This installs `tsbadparser` as an editable package. `from tsbadparser import TSBADParser` is available in any script run under the `tsbad` environment, without any extra install step.
+Everything is run from the repo root. `pytest tests` runs the parser and
+game tests.
 
-## Explorer app
+## Data format
 
-An interactive Streamlit app for exploring the benchmark. It has four pages:
+One folder per benchmark. Univariate series go under `uni`, multivariate
+under `multi`.
 
-| Page | What it shows |
-|------|---------------|
-| **Global Summary** | Benchmark-wide box plots and heatmaps (per dataset, per entity type) for any metric, from both a time-series and a detector perspective |
-| **Edge Cases** | The hardest and easiest series (or detector edge cases) for a chosen metric, with a Prev / Next viewer |
-| **Series Browser** | Randomly sample or review bookmarked series; shows anomaly labels and detector scores side by side |
-| **Anomaly Clusters** | Per-anomaly detectability ranking, grouping by best detector, and PCA + KMeans clustering with click-to-inspect |
+```
+<benchmark>/
+├── raw/{uni,multi}/<file>.csv                 value column(s), then a binary `Label` column
+├── scores/{uni,multi}/<Detector>/<file>.npy   one anomaly score per timestamp
+├── metrics/{uni,multi}/<Detector>.csv         one row per series: File Name, Model Name, AUC-PR, VUS-PR (L: 0..256)
+├── runtime/{uni,multi}/<Detector>.csv         optional: wall-clock per series
+└── splits/{U,M}-{Eval,Label}.csv              optional: which series are for evaluation
+```
 
-A **Kind** selector (`uni` / `multi`) is present in the sidebar of every page.
+A file is named `<num>_<Dataset>_id_<k>_<Domain>_tr_<train>_1st_<first>.csv`:
+its number, the collection it comes from, its index in that collection, a
+domain tag, the length of the train prefix (`tr_0` when there is none) and the
+index of the first anomaly. No `_` inside a field.
 
-### 1. Precompute anomaly features (one-time, per kind)
+This is TSB-AD's layout ([Liu & Paparrizos, NeurIPS 2024](https://github.com/thedatumorg/TSB-AD)),
+unchanged, so TSB-AD drops in as is.
 
-The Anomaly Clusters page requires a precomputed parquet file. Run once per kind you want to explore:
+### Where the data lives
+
+Benchmarks sit side by side in one folder, `$TSAD_BENCHMARKS` (default
+`~/Documents/tsad-benchmarks`), one sub-folder each. The repo's `data/` is
+TSB-AD: `raw/`, `scores/`, `metrics/` and `runtime/` are links into
+`$TSAD_BENCHMARKS/tsb-ad/` (gitignored), and only `splits/` and
+`benchmark_summary.json` are tracked.
 
 ```bash
-# from the project root
-python src/app/precompute.py --kind uni   # → data/anomaly_features_uni.parquet
-python src/app/precompute.py --kind multi # → data/anomaly_features_multi.parquet
+for d in raw scores metrics runtime; do ln -s ~/Documents/tsad-benchmarks/tsb-ad/$d data/$d; done
 ```
 
-### 2. Launch the app
-
-```bash
-# from the project root
-streamlit run src/app/explorer.py
-```
-
----
-
-## Usage
+Any other folder in the format loads by name or by path:
 
 ```python
-from tsbadparser import TSBADParser
-
-# Looks for data/ next to this repo by default
-parser = TSBADParser(kind="uni")   # or kind="multi"
-
-# Metadata
-print(parser.get_datasets())    # ['NAB', 'YAHOO', ...]
-print(parser.get_detectors())   # ['AnomalyTransformer', 'IForest', ...]
-
-# Load time series
-fnames, timeseries, labels = parser.load_timeseries(dataset=["NAB"])
-
-# Load anomaly scores
-scores, bad = parser.load_scores(detectors=["IForest", "LOF"], filenames=fnames)
-# scores[i] has shape (n_detectors, T)
-
-# Load scores and drop problematic files (mutates fnames/timeseries/labels in-place)
-fnames, timeseries, labels = parser.load_timeseries(dataset=["NAB"])
-scores, bad = parser.load_scores_and_delete(fnames, timeseries, labels)
-
-# Metrics and runtime
-df_metrics = parser.load_metrics()
-df_runtime = parser.load_runtime()
-
-# Official splits
-splits = parser.load_splits()   # {'eval': [...], 'label': [...]}
-
-# Visualize
-parser.visualize_timeseries(
-    timeseries[0],
-    anomaly_labels=labels[0],
-    title=fnames[0],
-    detector_scores=[scores[0][0], scores[0][1]],
-    detector_names=["IForest", "LOF"],
-)
+from app.parser import TSBADParser
+TSBADParser.list_benchmarks()                      # ['mtsbench', 'tab', 'timeeval', 'tsb-ad', 'tsb-uad']
+parser = TSBADParser(benchmark="tab", kind="multi")
+parser = TSBADParser("/path/to/a/benchmark", kind="uni")
 ```
 
-## Benchmark citation
+## Run it on your data
 
-```bibtex
-@article{liu2024elephant,
-  title     = {The elephant in the room: Towards a reliable time-series anomaly detection benchmark},
-  author    = {Liu, Qinghua and Paparrizos, John},
-  journal   = {Advances in Neural Information Processing Systems},
-  volume    = {37},
-  pages     = {108231--108261},
-  year      = {2024}
-}
-```
+1. **Convert.** Write your series as `raw/uni/<file>.csv` (or `multi`) in the
+   format above. `app/convert/` has one module per benchmark we converted;
+   `tab.py` is the shortest to copy. `common.py` does the validation, the
+   numbering and the bookkeeping.
+2. **Score.** `scripts/run_detectors.py` runs TSB-AD's detectors on a
+   benchmark and writes `scores/`; `scripts/compute_metrics.py` turns scores
+   into `metrics/`.
+3. **Open.** Put the folder under `$TSAD_BENCHMARKS` and pick it in the
+   demo's sidebar. The Workbench shows every series with at least one score;
+   the Landscape needs metrics.
 
 ## Credits
 
-- **Benchmark data**: Qinghua Liu & John Paparrizos (NeurIPS 2024)
-- **This parser**: Emmanouil Sylligardos, 3rd year PhD, Paris, 2026
+- Benchmark data: Qinghua Liu and John Paparrizos, *The elephant in the room:
+  Towards a reliable time-series anomaly detection benchmark*, NeurIPS 2024.
+- Pyxida and Needle: Emmanouil Sylligardos, 3rd year PhD, Paris, 2026.

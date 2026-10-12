@@ -7,7 +7,7 @@ Run one section:   pytest -v -s tests/test_parser.py -k "timeseries"
 
 import numpy as np
 import pytest
-from tsbadparser import TSBADParser
+from app.parser import TSBADParser
 
 
 # ---------------------------------------------------------------------------

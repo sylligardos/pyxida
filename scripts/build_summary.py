@@ -10,8 +10,8 @@ reading every label file -- about a minute. A demo cannot pay that on page load,
 so it is paid here, once, into a file small enough to ship with the repo.
 
 Run:
-    python src/demo/build_summary.py            # uni
-    python src/demo/build_summary.py --kind multi
+    python scripts/build_summary.py            # uni
+    python scripts/build_summary.py --kind multi
 """
 
 import argparse
@@ -21,10 +21,10 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "src"))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
-from tsbadparser import TSBADParser  # noqa: E402
+from app.parser import TSBADParser  # noqa: E402
 
 OUT_PATH = REPO_ROOT / "data" / "benchmark_summary.json"
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-GAME = Path(__file__).parent.parent / "src" / "game"
+GAME = Path(__file__).resolve().parents[1] / "game"
 sys.path.insert(0, str(GAME))
 
 from scoring import (clean_ranges, detector_caught, evaluate, labels_to_ranges,  # noqa: E402

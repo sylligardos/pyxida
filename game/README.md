@@ -8,8 +8,8 @@ screens).
 ## Run
 
 ```bash
-python src/game/make_dev_pack.py     # once: 20 synthetic series in data/game/dev
-python src/game/server.py            # http://localhost:8000
+python game/make_dev_pack.py     # once: 20 synthetic series in data/game/dev
+python game/server.py            # http://localhost:8000
 ```
 
 `?screen=board` opens on the leaderboard, for the booth monitor.
@@ -18,12 +18,12 @@ For real data, build a pack from the benchmark (needs the data and the
 divergence tables, so on the work laptop), then point the server at it:
 
 ```bash
-python src/game/make_tiers.py          # data/divergence/tiers_uni.csv, from the study's oracle
-python src/game/pick_team.py           # ranks the detectors; the top five by Shapley are the team
-python src/game/build_pack.py --detectors KShapeAD Sub_LOF MatrixProfile LOF MOMENT_FT \
+python game/make_tiers.py          # data/divergence/tiers_uni.csv, from the study's oracle
+python game/pick_team.py           # ranks the detectors; the top five by Shapley are the team
+python game/build_pack.py --detectors KShapeAD Sub_LOF MatrixProfile LOF MOMENT_FT \
     --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
-python src/game/check_pack.py data/game/tsb-ad --list    # windows, decoys, how the detectors do
-python src/game/server.py --pack data/game/tsb-ad --db data/game/icde.sqlite
+python game/check_pack.py data/game/tsb-ad --list    # windows, decoys, how the detectors do
+python game/server.py --pack data/game/tsb-ad --db data/game/icde.sqlite
 ```
 
 The server needs only `starlette` and `uvicorn` (both in the `tsbad` env) and

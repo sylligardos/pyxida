@@ -24,9 +24,9 @@ The team: pick_team.py ranks the detectors by Shapley value against the
 oracle; pass the top five with --detectors.
 
 Run:
-    python src/game/make_tiers.py
-    python src/game/pick_team.py
-    python src/game/build_pack.py --detectors KShapeAD Sub_LOF MatrixProfile LOF MOMENT_FT \\
+    python game/make_tiers.py
+    python game/pick_team.py
+    python game/build_pack.py --detectors KShapeAD Sub_LOF MatrixProfile LOF MOMENT_FT \\
         --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
 """
 
@@ -39,13 +39,13 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # repo root
 
 from pack import Series, quantize, round_values, write_pack  # noqa: E402
 from scoring import labels_to_ranges  # noqa: E402
-from tsbadparser import TSBADParser  # noqa: E402
+from app.parser import TSBADParser  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def tiers_from_metrics(parser: TSBADParser, solved: float) -> pd.Series:

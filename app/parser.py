@@ -5,7 +5,7 @@
 @what: Parser for TSAD benchmarks in the common (TSB-AD) format.
 
 TSB-AD is the default. Any other benchmark converted into the same format (see
-README.md at the benchmarks root, and src/convert/) is read the same way:
+README.md at the repo root, and app/convert/) is read the same way:
 
     TSBADParser(benchmark="tab", kind="multi")
 
@@ -68,9 +68,9 @@ class TSBADParser:
         "TranAD", "USAD",
     ]
 
-    # Repo's own data/ folder (this file lives at src/tsbadparser/parser.py);
+    # Repo's own data/ folder (this file lives at app/parser.py);
     # TSB-AD's fallback location.
-    _DEFAULT_DATA_PATH = Path(__file__).parent.parent.parent / "data"
+    _DEFAULT_DATA_PATH = Path(__file__).parent.parent / "data"
     DEFAULT_BENCHMARK = "tsb-ad"
 
     @staticmethod

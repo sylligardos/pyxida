@@ -13,8 +13,8 @@ it, on "medium" one or two, on "unsolved" none, and a decoy has nothing to
 catch. Every number is made up; never show this pack at the booth.
 
 Run:
-    python src/game/make_dev_pack.py                 # -> data/game/dev
-    python src/game/make_dev_pack.py --out /tmp/pack
+    python game/make_dev_pack.py                 # -> data/game/dev
+    python game/make_dev_pack.py --out /tmp/pack
 """
 
 import argparse
@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pack import Series, quantize, round_values, write_pack  # noqa: E402
 from scoring import n_points  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "data" / "game" / "dev"
 
 DETECTORS = ["Sub_PCA", "KShapeAD", "POLY", "Series2Graph", "MOMENT_FT"]

@@ -17,9 +17,9 @@ GET /series sends the values only, and the reveal comes back from POST
     POST /api/round/{rid}/finish            totals, rank on the board
 
 Run:
-    python src/game/make_dev_pack.py        # once, for the synthetic pack
-    python src/game/server.py               # http://localhost:8000
-    python src/game/server.py --pack data/game/tsb-ad --db data/game/icde.sqlite
+    python game/make_dev_pack.py        # once, for the synthetic pack
+    python game/server.py               # http://localhost:8000
+    python game/server.py --pack data/game/tsb-ad --db data/game/icde.sqlite
 """
 
 import argparse
@@ -43,7 +43,7 @@ from pack import Pack, load_pack  # noqa: E402
 from scoring import DETECTOR_RULE, score_series  # noqa: E402
 from store import Store  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).resolve().parent / "web"
 
 # One round: two easy, two medium, one unsolved, one decoy, in random order.

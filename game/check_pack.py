@@ -11,8 +11,8 @@ find the anomaly, their false alarms, and their points. Then each detector's
 own catch rate, and the decoys the detectors take the bait on.
 
 Run:
-    python src/game/check_pack.py                    # data/game/dev
-    python src/game/check_pack.py data/game/tsb-ad --list
+    python game/check_pack.py                    # data/game/dev
+    python game/check_pack.py data/game/tsb-ad --list
 """
 
 import argparse
@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pack import TIERS, load_pack  # noqa: E402
 from scoring import detector_flags, evaluate, result_key  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def rows(pack) -> pd.DataFrame:

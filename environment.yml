@@ -192,7 +192,6 @@ dependencies:
       - tenacity==9.1.4
       - threadpoolctl==3.6.0
       - toml==0.10.2
-      - tsbadparser==0.1.0
       - urllib3==2.7.0
       - uvicorn==0.47.0
       - watchdog==6.0.0

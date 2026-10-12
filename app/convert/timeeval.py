@@ -33,7 +33,7 @@ Keogh) have no files and are listed in _excluded.csv.
 No scores: TimeEval publishes metrics per run, not per-timestep scores.
 
 Run:
-    python src/convert/timeeval.py
+    python app/convert/timeeval.py
 """
 
 import sys

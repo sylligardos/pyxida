@@ -15,8 +15,8 @@ AUC-PR is scikit-learn's average precision. VUS-PR comes from FF-VUS
 above. GPU if available, CPU otherwise.
 
 Run from the ffvus environment, which has FF-VUS's dependencies:
-    conda run -n ffvus python src/metrics/compute_metrics.py --benchmark tsb-uad
-    conda run -n ffvus python src/metrics/compute_metrics.py --benchmark tab --detectors IForest SR
+    conda run -n ffvus python scripts/compute_metrics.py --benchmark tsb-uad
+    conda run -n ffvus python scripts/compute_metrics.py --benchmark tab --detectors IForest SR
 """
 
 import argparse
@@ -34,7 +34,7 @@ FFVUS_SRC = Path.home() / "Documents" / "ff-vus" / "src"
 sys.path.insert(0, str(FFVUS_SRC))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tsbadparser import TSBADParser  # noqa: E402
+from app.parser import TSBADParser  # noqa: E402
 
 BUFFERS = [0] + [2 ** x for x in range(9)]   # 0, 1, 2, 4, ..., 256
 

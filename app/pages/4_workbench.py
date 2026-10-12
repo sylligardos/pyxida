@@ -11,13 +11,13 @@ that is what a reader wants to see first: the best anyone did on this series.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from lib import (
+from app.lib import (
     WORKBENCH_ANOMALY_KEY,
     WORKBENCH_COMBOS_KEY,
     WORKBENCH_KEY,

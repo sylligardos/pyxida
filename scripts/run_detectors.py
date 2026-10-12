@@ -20,7 +20,7 @@ wrapper returns an error *string* when a detector crashes, which is logged.
 Series already scored are skipped, so a rerun resumes.
 
 Run:
-    conda run -n tsbad-run python src/metrics/run_detectors.py \\
+    conda run -n tsbad-run python scripts/run_detectors.py \\
         --benchmark tab --kind uni --datasets NAB YAHOO --detectors SR IForest
 """
 
@@ -43,7 +43,7 @@ import pandas as pd  # noqa: E402
 from tqdm import tqdm  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tsbadparser import TSBADParser  # noqa: E402
+from app.parser import TSBADParser  # noqa: E402
 
 
 def _job(args):

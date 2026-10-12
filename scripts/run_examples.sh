@@ -5,7 +5,7 @@
 set -e
 UNI="SR POLY Sub_PCA IForest MatrixProfile KShapeAD"
 MULTI="PCA HBOS IForest COPOD CBLOF"
-RUN="conda run -n tsbad-run python src/metrics/run_detectors.py"
+RUN="conda run -n tsbad-run python scripts/run_detectors.py"
 
 $RUN --benchmark timeeval --kind uni   --datasets NAB NASA-MSL NASA-SMAP MGAB Dodgers --detectors $UNI
 $RUN --benchmark timeeval --kind multi --datasets SMD Daphnet --detectors $MULTI
@@ -16,6 +16,6 @@ $RUN --benchmark mtsbench --kind multi \
   --datasets SMD Daphnet MSL SMAP CalIt2 Genesis room-occupancy metro GECCO PSM --detectors $MULTI
 
 for b in timeeval tab mtsbench; do
-  conda run -n ffvus python src/metrics/compute_metrics.py --benchmark $b
+  conda run -n ffvus python scripts/compute_metrics.py --benchmark $b
 done
 echo "=== examples done"

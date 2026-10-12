@@ -14,7 +14,7 @@ converted too: scores/uni/<Det>/<file>.npy. The shipped scores are rounded to
 two decimals; they are kept as they are.
 
 Run:
-    python src/convert/tsb_uad.py
+    python app/convert/tsb_uad.py
 """
 
 import sys

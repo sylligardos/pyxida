@@ -27,7 +27,7 @@ No scores: mTSBench publishes a per-series VUS-PR table (kept in
 _original/published/, computed with its own evaluation code), not scores.
 
 Run:
-    python src/convert/mtsbench.py
+    python app/convert/mtsbench.py
 """
 
 import sys

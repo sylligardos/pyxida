@@ -12,14 +12,14 @@ per surface.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from lib import (
+from app.lib import (
     benchmark_summary,
     chart_selection,
     current_benchmark,
@@ -85,7 +85,7 @@ table = landscape(current_benchmark(), KIND, buffer)
 if table.empty:
     st.info(
         "No detector scores for this benchmark yet. Score it with "
-        "`src/metrics/run_detectors.py`, then `src/metrics/compute_metrics.py`."
+        "`scripts/run_detectors.py`, then `scripts/compute_metrics.py`."
     )
     st.stop()
 

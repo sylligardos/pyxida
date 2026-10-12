@@ -7,11 +7,11 @@ findings and they belong in the paper, not on the first thing a visitor sees.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root
 
 import streamlit as st
 
-from lib import (
+from app.lib import (
     ONE_SENTENCE,
     REPO_DATA,
     REPO_PARSER,
@@ -44,7 +44,7 @@ if DEMO_SERIES is None:
 
 # What the demo shows below the snippet is what the snippet produces. Kept as a
 # string so the two cannot drift into a lie: the page runs these exact calls.
-SNIPPET = f'''from tsbadparser import TSBADParser
+SNIPPET = f'''from app.parser import TSBADParser
 
 parser = TSBADParser(benchmark="{BENCHMARK}", kind="{KIND}")
 names, series, labels = parser.load_timeseries(
@@ -146,9 +146,6 @@ st.divider()
 
 takeaway("Everything here is one pip install away.")
 
-left, right = st.columns(2)
-if left.button("🔬 Sample a series", width='stretch'):
+if st.button("🔬 Sample a series", width='stretch'):
     st.session_state[WORKBENCH_SAMPLE_KEY] = True
     st.switch_page("pages/4_workbench.py")
-if right.button("🚀 Get started", width='stretch'):
-    st.switch_page("pages/5_get_started.py")

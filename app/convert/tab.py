@@ -18,7 +18,7 @@ as it is, even where the train part contains anomalies.
 No scores: TAB publishes only aggregated results.
 
 Run:
-    python src/convert/tab.py
+    python app/convert/tab.py
 """
 
 import sys
