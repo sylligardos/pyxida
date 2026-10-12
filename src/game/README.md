@@ -82,3 +82,44 @@ choice is remembered per browser.
 Per series: the player's ranges, "Nothing here", time spent, zoom and pan
 counts, the detectors' flags, both results, which labeled anomalies each side
 hit, and the "Now that you've seen it" answer. Tables in `store.py`.
+
+## Status and decisions
+
+Where the game stands (October 2026), for whoever picks it up next.
+
+**Built and tested** on the synthetic dev pack: all five screens, scoring,
+the play log, sound, the timer, Quit. `tests/test_game.py` covers the rules,
+the API and `build_pack.py` on a fake benchmark. Screens are checked to fit
+one viewport from 1280x720 to 2560x1440.
+
+**Open, in order:**
+
+1. Pick the detector team (Shapley top five against the oracle, or the
+   per-series best). The names in the Run example are placeholders.
+2. Make the tiers CSV (`filename,tier`, from the divergence study's oracle
+   results) and pass it with `--tiers`.
+3. Run `build_pack.py` on real TSB-AD data. It has never run on real data,
+   so check the windows, the decoys and how often the detectors win.
+4. Game modes and choosing a specific dataset: the author wants to go back to
+   design first. Discuss before building.
+
+**Decisions so far:**
+
+- The detectors are scored on their team-average score with a mean + 3 std
+  threshold. Pooling every detector's own flags was tried and dropped as
+  less clean (the detectors' false alarms pile up and they lose almost every
+  round). The author may switch again, which is why `DETECTOR_RULE` exists.
+- The player marks freely, but the UI caps them at five ranges.
+- The "Now that you've seen it" question is optional; never force it.
+- Arcade look from the design comps (magenta = player, cyan = detectors,
+  yellow = labels). Say "detectors", never "CPU".
+- Every screen fits one viewport on desktop sizes; no page scroll.
+- Audio must be free: synthesised effects (`arcade` style chosen, `laser` to
+  try), CC0 music only on Start, Summary and the Leaderboard, the "march"
+  under a round.
+- The game and the analysis of the plays (label audit, hardness) stay
+  separate; the server never touches the benchmark.
+
+**Working with the author:** design changes go screen by screen, with a
+review after each; show a proposal and discuss before touching code when
+asked to; commit and push only when asked.
