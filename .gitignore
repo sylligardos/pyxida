@@ -38,12 +38,12 @@ TODO.md
 # Reviewer notes taken in the demo -- personal, not part of the repo
 demo_notes.json
 
-# Private planning notes, paper symlink and third-party PDFs -- never public.
+# Private planning notes, the paper clone and third-party PDFs -- never public.
 # Only the Needle game brief and design comps are shared.
 references/*
 !references/GAME_BRIEF.md
 !references/needle-design/
-# Local Claude Code settings
+# Local editor and agent settings
 .claude/
 
 # Derived tables (regenerable; divergence is ~4GB)
@@ -52,3 +52,11 @@ data/anomaly_features_*.parquet
 
 # Needle content packs and play logs (regenerable / private)
 data/game/
+
+# ── Web demo (web/) ───────────────────────────────────────────────────────────
+# (web/.gitignore covers node_modules, .next, next-env.d.ts and .env files)
+web/AGENTS.md
+
+# Exported data for the web demo (regenerable with scripts/export_web.py)
+data/web/
+web/tests/scoring_golden.json
