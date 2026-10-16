@@ -15,8 +15,13 @@ matplotlib.use("Agg")
 import pytest
 from app.parser import TSBADParser  # noqa: E402
 
-# Absolute path to the data root. Edit this if you move the data directory.
-DATA_PATH = REPO_ROOT / "data"
+# TSB-AD itself (raw series, scores, metrics), where the parser looks for it:
+# $TSAD_BENCHMARKS/tsb-ad, else the repo's data/ links. The parser tests need
+# it and are skipped without it (a fresh clone has only data/splits).
+DATA_PATH = TSBADParser.benchmarks_root() / "tsb-ad"
+if not (DATA_PATH / "raw").exists():
+    DATA_PATH = REPO_ROOT / "data"
+HAS_TSB_AD = (DATA_PATH / "raw" / "uni").exists()
 
 
 @pytest.fixture(scope="session")

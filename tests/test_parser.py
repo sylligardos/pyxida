@@ -8,6 +8,9 @@ Run one section:   pytest -v -s tests/test_parser.py -k "timeseries"
 import numpy as np
 import pytest
 from app.parser import TSBADParser
+from conftest import HAS_TSB_AD
+
+pytestmark = pytest.mark.skipif(not HAS_TSB_AD, reason="needs TSB-AD in $TSAD_BENCHMARKS/tsb-ad")
 
 
 # ---------------------------------------------------------------------------
