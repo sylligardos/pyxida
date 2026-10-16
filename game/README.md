@@ -191,12 +191,16 @@ grid is five cards a row; the Start screen no longer says plays are logged
 for research. Every finished round is appended to `data/game/plays.csv`
 next to the SQLite log (one line per series), by both servers.
 
-**Open, in order:**
+**Decided 2026-10-16: the threshold stays at mean + 3 std**, computed on
+each opponent's own score when the series is scored. Measured on the new
+packs, opponent alone: TSB-AD finds 100% of easy, 92% of medium, 77% of
+unsolved series and leaves 24% of decoys clean; TSB-UAD 93%, 81%, 48%
+and 29%. With round points capped at +1/-1 the false-alarm counts no
+longer matter to the round, so the number is closed.
 
-1. Decide the opponent's threshold (mean + 3 std today; the table above
-   was measured on the five-detector team, so remeasure with
-   `check_pack.py` on the new packs).
-2. The design's open items: a summary card for several anomalies (moot
+**Open:**
+
+1. The design's open items: a summary card for several anomalies (moot
    while `--max-labels 1`), light mode, motion.
 
 **Decisions so far:**
