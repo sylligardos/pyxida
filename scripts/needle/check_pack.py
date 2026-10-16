@@ -73,8 +73,9 @@ def main():
     print(summary.to_string(), "\n")
 
     with_labels = r[r.labels > 0]
-    caught = {d: with_labels[f"caught_{d}"].mean() for d in pack.detectors}
-    print("Each detector alone, share of labeled series it catches:")
+    # A series holds only its opponent, so a detector is scored where it is one.
+    caught = {d: with_labels[f"caught_{d}"].mean() for d in pack.detectors if f"caught_{d}" in with_labels}
+    print("Each detector alone, share of the labeled series it opposes that it catches:")
     print(pd.Series(caught).round(2).to_string(), "\n")
     print("Labeled series caught by how many detectors alone:")
     print(with_labels.caught_by.value_counts().sort_index().to_string(), "\n")
