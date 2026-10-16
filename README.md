@@ -70,9 +70,10 @@ conda activate pyxida
    ```bash
    python scripts/needle/build_pack.py --benchmark <name> --per-tier 100 --out data/game/<name>
    ```
-   A round plays 10 series, and decoys come from series left over, so a
-   pack needs a few dozen series. For a small benchmark, lower `--per-tier`
-   and `--min-len` (default 1000 points).
+   A round plays up to 10 series, and decoys are cut from the series left
+   over once the tiers are filled, so keep `--per-tier` well under your
+   number of series. For a handful of short series, for example:
+   `--per-tier 2 --min-len 200`.
 5. Run the demo as above and pick `<name>` in the top bar.
 
 Every view works on a new benchmark. Only Redundancy's top-k against the
@@ -96,7 +97,7 @@ More in `web/README.md`, `scripts/needle/README.md`, and each script's header.
 ## Test
 
 ```bash
-pytest tests        # VUS-PR, Needle's rules and pack builder; the parser tests need TSB-AD in $TSAD_BENCHMARKS
+pytest tests        # VUS-PR, Needle's rules and pack builder; the parser tests need TSB-AD in $TSAD_BENCHMARKS (default ~/Documents/tsad-benchmarks)
 cd web && npm test  # the web tests
 ```
 
