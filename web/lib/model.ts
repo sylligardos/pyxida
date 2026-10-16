@@ -5,6 +5,8 @@ export const KINDS: Kind[] = ["uni", "multi"];
 export const KIND_LABEL: Record<Kind, string> = { uni: "Univariate", multi: "Multivariate" };
 
 export const YOUR_DATA = "yours";
+// The benchmarks the demo ships with, in menu order. Any other benchmark
+// exported under data/web/ is listed after them (listBenchmarks in data.ts).
 export const BENCHMARKS = [
   { id: "tsb-ad", label: "TSB-AD" },
   { id: "tsb-uad", label: "TSB-UAD" },
@@ -17,6 +19,8 @@ export const BENCHMARKS = [
 export const TOY = new Set(["timeeval", "tab", "mtsbench"]);
 export const isToy = (benchmark: string) => TOY.has(benchmark);
 export const DEFAULT_BENCHMARK = "tsb-ad";
+// A benchmark id is a folder name under data/web/.
+export const BENCHMARK_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 export type State = { benchmark: string; kind: Kind };
 
@@ -42,7 +46,7 @@ type Params = Record<string, string | string[] | undefined>;
 export function stateFrom(params: Params): State {
   const b = typeof params.b === "string" ? params.b : DEFAULT_BENCHMARK;
   const k = params.k === "multi" ? "multi" : "uni";
-  return { benchmark: BENCHMARKS.some((x) => x.id === b) ? b : DEFAULT_BENCHMARK, kind: k };
+  return { benchmark: b === YOUR_DATA || BENCHMARK_ID.test(b) ? b : DEFAULT_BENCHMARK, kind: k };
 }
 
 export function href(pathname: string, state: State, extra: Record<string, string> = {}): string {

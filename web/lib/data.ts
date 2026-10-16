@@ -4,7 +4,7 @@
 
 import { promises as fs } from "fs";
 import path from "path";
-import { Kind, Landscape, Redundancy, Series, SeriesDoc, State, Summary, YOUR_DATA } from "./model";
+import { BENCHMARKS, BENCHMARK_ID, Kind, Landscape, Redundancy, Series, SeriesDoc, State, Summary, YOUR_DATA } from "./model";
 
 export * from "./model";
 
@@ -38,6 +38,23 @@ export async function hasKind(benchmark: string, kind: Kind): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// The menu: the shipped benchmarks, then any other benchmark exported under
+// DATA_ROOT (named by its summary's label), then "Run on your data".
+export async function listBenchmarks(): Promise<{ id: string; label: string }[]> {
+  let dirs: string[] = [];
+  try {
+    dirs = (await fs.readdir(DATA_ROOT, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch { /* no data yet */ }
+  const extra = dirs.filter((d) => BENCHMARK_ID.test(d) && d !== YOUR_DATA && !BENCHMARKS.some((b) => b.id === d)).sort();
+  const found = await Promise.all(extra.map(async (id) => {
+    const s = (await readJson<Summary>(id, "uni", "summary.json")) ?? (await readJson<Summary>(id, "multi", "summary.json"));
+    return s ? { id, label: s.label ?? id } : null;
+  }));
+  const shipped = BENCHMARKS.filter((b) => b.id !== YOUR_DATA);
+  const yours = BENCHMARKS.filter((b) => b.id === YOUR_DATA);
+  return [...shipped, ...found.filter((b): b is { id: string; label: string } => b !== null), ...yours];
 }
 
 export const fmt = (n: number) => n.toLocaleString("en-US");

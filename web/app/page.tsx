@@ -142,17 +142,17 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
               <span className="num">2</span>
               <div className="body">
                 <b>Score</b>
-                <span>Run the detectors and compute the metrics. Both scripts take the folder and write <code className="inline">scores/</code> and <code className="inline">metrics/</code> next to it.</span>
-                <pre className="code">{`python scripts/run_detectors.py <benchmark>
-python scripts/compute_metrics.py <benchmark>`}</pre>
+                <span>Bring your detectors&apos; scores (or run TSB-AD&apos;s with <code className="inline">scripts/run_detectors.py</code>), then compute the metrics. It writes <code className="inline">metrics/</code> next to <code className="inline">scores/</code>.</span>
+                <pre className="code">{`python scripts/compute_metrics.py --benchmark <benchmark>`}</pre>
               </div>
             </article>
             <article className="panel step">
               <span className="num">3</span>
               <div className="body">
                 <b>Open</b>
-                <span>Export the folder for the demo, then pick it in the menu at the top. The Workbench shows every series with a score; the Landscape needs the metrics.</span>
-                <pre className="code">{`python scripts/export_web.py --benchmark <benchmark>`}</pre>
+                <span>Export the folder for the demo, then pick it in the menu at the top. The repo&apos;s README has every step.</span>
+                <pre className="code">{`python scripts/export_web.py --benchmark <benchmark> --all
+python scripts/export_graph.py --benchmark <benchmark>`}</pre>
               </div>
             </article>
           </div>

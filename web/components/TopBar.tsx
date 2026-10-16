@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BENCHMARKS, KIND_LABEL, KINDS, State, href, hasKind, YOUR_DATA } from "@/lib/data";
+import { KIND_LABEL, KINDS, State, href, hasKind, listBenchmarks, YOUR_DATA } from "@/lib/data";
 import { BenchmarkSelect } from "./BenchmarkSelect";
 import { HelpButton } from "./HelpButton";
 
@@ -19,6 +19,7 @@ const Chevron = () => (
 
 export async function TopBar({ state, current }: { state: State; current: string }) {
   const kinds = await Promise.all(KINDS.map(async (k) => [k, await hasKind(state.benchmark, k)] as const));
+  const benchmarks = await listBenchmarks();
   return (
     <header className="topbar">
       <div className="wrap">
@@ -38,7 +39,7 @@ export async function TopBar({ state, current }: { state: State; current: string
         </nav>
         <div className="controls">
           <div className="select">
-            <BenchmarkSelect value={state.benchmark} kind={state.kind} options={BENCHMARKS} yours={YOUR_DATA} />
+            <BenchmarkSelect value={state.benchmark} kind={state.kind} options={benchmarks} yours={YOUR_DATA} />
             <Chevron />
           </div>
           <div className="seg" role="group" aria-label="Series kind">
