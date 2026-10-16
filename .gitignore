@@ -33,17 +33,12 @@ data/notes.json
 .vscode/
 *.swp
 
-# ── Local notes ───────────────────────────────────────────────────────────────
-TODO.md
+# ── Local only ────────────────────────────────────────────────────────────────
+# Old work and notes, kept locally, not maintained
+archive/
 
-# Reviewer notes taken in the demo -- personal, not part of the repo
-demo_notes.json
-
-# Private planning notes, the paper clone and third-party PDFs -- never public.
-# Only the Needle game brief and design comps are shared.
-references/*
-!references/GAME_BRIEF.md
-!references/needle-design/
+# The paper clone (its own git, Overleaf origin) and third-party PDFs
+references/
 # Local editor and agent settings
 .claude/
 

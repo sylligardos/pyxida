@@ -4,7 +4,7 @@
 //
 // Each screen is a function that renders into #app. The server holds the
 // labels and scores; this file only draws what it is sent. Layout, copy and
-// colours follow references/needle-design (the *Arcade comps).
+// colours follow archive/references/needle-design (the *Arcade comps).
 
 import { SeriesChart, MapStrip, attractSeries } from './chart.js';
 import { sfx, music, ambient, setMuted } from './sfx.js';

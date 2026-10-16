@@ -5,7 +5,7 @@
 // scope and metric, drawn from precomputed positions; its Louvain
 // communities are the "neighbourhoods". The right column shows either the
 // neighbourhoods, or the clicked series with its neighbours stacked below.
-// The highlight rules follow references/graph-design/graph-page-mock.html,
+// The highlight rules follow archive/references/graph-design/graph-page-mock.html,
 // without its series search.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

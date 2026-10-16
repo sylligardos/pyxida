@@ -1,9 +1,7 @@
 # Needle
 
 The ICDE 2027 demo game: a player marks anomalies in a real series, then sees
-the labels and what a team of detectors flagged, and both are scored. Brief:
-`references/GAME_BRIEF.md`. Design: `references/needle-design/` (the arcade
-screens).
+the labels and what a team of detectors flagged, and both are scored.
 
 ## Run
 

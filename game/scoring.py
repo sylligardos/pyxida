@@ -5,7 +5,7 @@
 @what: Needle -- the scoring rules, in one place.
 
 A range is a pair [a, b] of inclusive point indices. The rules, from
-references/GAME_BRIEF.md:
+archive/references/GAME_BRIEF.md:
 
     hit           a labeled anomaly that at least one range overlaps (+1).
                   Counted per anomaly, not per range, so five ranges on the

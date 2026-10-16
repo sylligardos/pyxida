@@ -1,99 +1,71 @@
 # Pyxida
 
-The demo behind the ICDE 2027 submission *Pyxida*: an interactive tour of a
-time-series anomaly detection benchmark (which datasets and anomaly types are
-still open, and what the detectors actually did on any one series), and
-**Needle**, the booth game where a person marks anomalies against a team of
-detectors.
+The demo behind the ICDE 2027 demo paper *Pyxida*: a web app that reads a
+time-series anomaly detection benchmark series by series (which datasets are
+still open, which detectors matter, what they did on any one series), plus
+**Needle**, a booth game where a person marks anomalies against the best
+detector.
 
-It runs on TSB-AD out of the box, and on any data in the format below.
+Runs on TSB-AD out of the box, and on any benchmark in the same format.
 
 ## Layout
 
 ```
 pyxida/
-├── app/            the demo (Streamlit): main.py, pages/, lib.py
-│   ├── parser.py   reads a benchmark in the data format
-│   └── convert/    converters into the format (TSB-UAD, TAB, TimeEval, mTSBench)
-├── game/           Needle, the booth game (Starlette + vanilla JS); see game/README.md
-├── scripts/        produce the data: run detectors, compute metrics, build the summary
-├── data/           the data, in the format (links into the benchmarks root; see below)
-├── tests/
-└── archive/        earlier work, kept but not maintained; see archive/README.md
+├── web/        the demo (Next.js): Graph, Explore, Workbench, and Needle at /play
+├── game/       Needle: its screens (game/web), scoring rules, pack builders
+├── scripts/    the data pipeline: run detectors, metrics, export for the web
+├── app/        parser.py (reads a benchmark) and convert/ (other benchmarks into the format)
+├── data/       the data (see below)
+└── tests/
 ```
 
 ## Run
 
 ```bash
-conda env create -f environment.yml
-conda activate tsbad
-
-streamlit run app/main.py          # the demo, http://localhost:8501
-python game/make_dev_pack.py       # once: a synthetic pack for Needle
-python game/server.py              # the game, http://localhost:8000
+conda env create -f environment.yml && conda activate tsbad
+cd web && npm install && npm run dev      # http://localhost:3000
 ```
 
-Everything is run from the repo root. `pytest tests` runs the parser and
-game tests.
+The app only reads `data/web/` (exported series and tables) and `data/game/`
+(Needle packs). If you have them, that is all you need.
 
-## Data format
+## Data
 
-One folder per benchmark. Univariate series go under `uni`, multivariate
-under `multi`.
+Benchmarks sit in `$TSAD_BENCHMARKS` (default `~/Documents/tsad-benchmarks`),
+one folder each, in TSB-AD's layout:
 
 ```
 <benchmark>/
-├── raw/{uni,multi}/<file>.csv                 value column(s), then a binary `Label` column
-├── scores/{uni,multi}/<Detector>/<file>.npy   one anomaly score per timestamp
-├── metrics/{uni,multi}/<Detector>.csv         one row per series: File Name, Model Name, AUC-PR, VUS-PR (L: 0..256)
-├── runtime/{uni,multi}/<Detector>.csv         optional: wall-clock per series
-└── splits/{U,M}-{Eval,Label}.csv              optional: which series are for evaluation
+├── raw/{uni,multi}/<file>.csv                 values, then a binary Label column
+├── scores/{uni,multi}/<Detector>/<file>.npy   one score per timestamp
+└── metrics/{uni,multi}/<Detector>.csv         one row per series: AUC-PR, VUS-PR
 ```
 
-A file is named `<num>_<Dataset>_id_<k>_<Domain>_tr_<train>_1st_<first>.csv`:
-its number, the collection it comes from, its index in that collection, a
-domain tag, the length of the train prefix (`tr_0` when there is none) and the
-index of the first anomaly. No `_` inside a field.
-
-This is TSB-AD's layout ([Liu & Paparrizos, NeurIPS 2024](https://github.com/thedatumorg/TSB-AD)),
-unchanged, so TSB-AD drops in as is.
-
-### Where the data lives
-
-Benchmarks sit side by side in one folder, `$TSAD_BENCHMARKS` (default
-`~/Documents/tsad-benchmarks`), one sub-folder each. The repo's `data/` is
-TSB-AD: `raw/`, `scores/`, `metrics/` and `runtime/` are links into
-`$TSAD_BENCHMARKS/tsb-ad/` (gitignored), and only `splits/` and
-`benchmark_summary.json` are tracked.
+`data/raw`, `scores`, `metrics` and `runtime` are links into
+`$TSAD_BENCHMARKS/tsb-ad/`:
 
 ```bash
 for d in raw scores metrics runtime; do ln -s ~/Documents/tsad-benchmarks/tsb-ad/$d data/$d; done
 ```
 
-Any other folder in the format loads by name or by path:
+To rebuild what the app reads, from the repo root:
 
-```python
-from app.parser import TSBADParser
-TSBADParser.list_benchmarks()                      # ['mtsbench', 'tab', 'timeeval', 'tsb-ad', 'tsb-uad']
-parser = TSBADParser(benchmark="tab", kind="multi")
-parser = TSBADParser("/path/to/a/benchmark", kind="uni")
+```bash
+python scripts/export_web.py --benchmark tsb-ad --kind uni --all   # data/web/
+python scripts/export_graph.py --benchmark tsb-ad --kind uni       # the Graph page
+python game/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
 ```
 
-## Run it on your data
+Details: `web/README.md`, `game/README.md`, and each script's header.
 
-1. **Convert.** Write your series as `raw/uni/<file>.csv` (or `multi`) in the
-   format above. `app/convert/` has one module per benchmark we converted;
-   `tab.py` is the shortest to copy. `common.py` does the validation, the
-   numbering and the bookkeeping.
-2. **Score.** `scripts/run_detectors.py` runs TSB-AD's detectors on a
-   benchmark and writes `scores/`; `scripts/compute_metrics.py` turns scores
-   into `metrics/`.
-3. **Open.** Put the folder under `$TSAD_BENCHMARKS` and pick it in the
-   demo's sidebar. The Workbench shows every series with at least one score;
-   the Landscape needs metrics.
+## Test
 
-## Credits
+```bash
+pytest tests                 # parser and Needle (game/server.py is the Python reference for the rules)
+cd web && npm test           # the TypeScript scoring against the Python one
+```
 
-- Benchmark data: Qinghua Liu and John Paparrizos, *The elephant in the room:
-  Towards a reliable time-series anomaly detection benchmark*, NeurIPS 2024.
-- Pyxida and Needle: Emmanouil Sylligardos, 3rd year PhD, Paris, 2026.
+## License
+
+MIT, see `LICENSE`.

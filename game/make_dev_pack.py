@@ -5,7 +5,7 @@
 @what: Needle -- a synthetic content pack, to build and test the game without
 the benchmark.
 
-Same generator as the design comps (references/needle-design/project/
+Same generator as the design comps (archive/references/needle-design/project/
 Chart.dc.html): a noisy periodic signal with drift, and anomalies of a few
 kinds. Five fake detectors per series fire either on the anomaly or somewhere
 else, so the tiers behave like the real ones: on "easy" most of them catch

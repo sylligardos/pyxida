@@ -29,7 +29,7 @@ from app.parser import TSBADParser  # noqa: E402
 OUT_PATH = REPO_ROOT / "data" / "benchmark_summary.json"
 
 # Scores are unusable on 10.7% of series for Lag_Llama (absent on 48, wrong
-# length on 45) and on 0.1% for SAND (one file). See references/DEMO_PLAN.md --
+# length on 45) and on 0.1% for SAND (one file). See archive/references/DEMO_PLAN.md --
 # SAND is meant to come back.
 EXCLUDED = ["Lag_Llama", "SAND"]
 
