@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { SeriesPlot } from "@/components/SeriesPlot";
+import { ToyNote } from "@/components/ToyNote";
 import { KIND_LABEL, fmt, fmtM, href, loadSeries, loadSummary, stateFrom } from "@/lib/data";
 
 const AUTHOR = {
@@ -38,6 +39,7 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
           </p>
         </section>
 
+        <ToyNote benchmark={state.benchmark} />
         {summary ? (
           <section className="wrap counts">
             <div className="row">
@@ -48,7 +50,7 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
               <Count n={fmtM(summary.n_points)} label="Points" />
             </div>
             <p className="muted" style={{ fontSize: 14 }}>
-              {summary.label}, {kindLabel}. Every detector scored every series. Counts are read from the data, not typed in.
+              {summary.label}, {kindLabel}. {summary.toy ? "Only the series the detectors were run on." : "Every detector scored every series."} Counts are read from the data, not typed in.
             </p>
           </section>
         ) : (

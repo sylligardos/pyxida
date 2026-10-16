@@ -16,6 +16,7 @@ locally from data/web/ and later from object storage, the same paths.
 Run, from the repo root:
     python scripts/export_web.py --benchmark tsb-ad --kind uni
     python scripts/export_web.py --benchmark tsb-uad --kind uni
+    python scripts/export_web.py --benchmark timeeval --kind uni --all   # a toy example: only the scored series
     python scripts/export_web.py --benchmark tsb-ad --kind uni --series 001_NAB_id_1_Facility_tr_1007_1st_2014.csv   # one series and its scores, no tables
     python scripts/export_web.py --benchmark tsb-ad --kind uni --all      # every series and every score
 """
@@ -42,7 +43,11 @@ from scoring import labels_to_ranges as label_runs  # noqa: E402
 OUT_ROOT = REPO_ROOT / "data" / "web"
 TSB_AD_SUMMARY = REPO_ROOT / "data" / "benchmark_summary.json"
 
-LABELS = {"tsb-ad": "TSB-AD", "tsb-uad": "TSB-UAD"}
+LABELS = {"tsb-ad": "TSB-AD", "tsb-uad": "TSB-UAD", "timeeval": "TimeEval", "tab": "TAB", "mtsbench": "mTSBench"}
+
+# Toy examples: a few fast detectors run on a few datasets
+# (scripts/run_examples.sh). Only the series they scored are exported.
+TOY = {"timeeval", "tab", "mtsbench"}
 
 # Detectors whose scores are unusable on part of the benchmark (the list is
 # scripts/build_summary.py's); they are not counted and not exported.
@@ -88,6 +93,7 @@ def export_summary(parser: TSBADParser, out: Path) -> dict:
         "benchmark": parser.benchmark,
         "label": LABELS.get(parser.benchmark, parser.benchmark),
         "kind": parser.kind,
+        "toy": parser.benchmark in TOY,
         "n_series": int(len(meta)),
         "n_datasets": int(meta.dataset.nunique()),
         "n_detectors": len(detectors),
@@ -254,7 +260,8 @@ def weighted_tau(parser: TSBADParser, files: list[str], detectors: list[str]) ->
     score is missing or constant. Slow (tens of minutes on one core), so
     spread over the cores and cached next to the study's tables."""
     from concurrent.futures import ProcessPoolExecutor
-    cache = DIVERGENCE / f"weighted_tau_{parser.kind}.npz"
+    name = f"weighted_tau_{parser.kind}.npz" if parser.is_tsb_ad() else f"weighted_tau_{parser.benchmark}_{parser.kind}.npz"
+    cache = DIVERGENCE / name
     if cache.exists():
         z = np.load(cache, allow_pickle=False)
         if list(z["files"]) == files and list(z["detectors"]) == detectors:
@@ -275,16 +282,17 @@ EXAMPLES = 3   # per dataset and pair, the series with the highest weighted tau
 
 
 def export_redundancy(parser: TSBADParser, out: Path, summary: dict) -> Path | None:
-    """The Redundancy page's tables, TSB-AD univariate only (the study's
-    tables exist only there): every pair's agreement, the weighted Kendall
-    tau of their scores, and per series what the top-k by rank scored
-    against the best k-set."""
+    """The Redundancy page's tables: every pair's agreement, the weighted
+    Kendall tau of their scores, and, where the exhaustive search exists
+    (TSB-AD univariate), per series what the top-k by rank scored against
+    the best k-set."""
     import warnings
     import pandas as pd
     roster = DIVERGENCE / f"combos_{parser.kind}_detectors.parquet"
     shards = [p for p in sorted(DIVERGENCE.glob(f"combos_{parser.kind}_*.parquet")) if p != roster]
-    if not (parser.is_tsb_ad() and roster.exists() and shards and (out / "landscape.json").exists()):
+    if not (out / "landscape.json").exists():
         return None
+    search = parser.is_tsb_ad() and roster.exists() and bool(shards)
     detectors = summary["detectors"]
     nd = len(detectors)
     land = json.loads((out / "landscape.json").read_text())
@@ -338,10 +346,18 @@ def export_redundancy(parser: TSBADParser, out: Path, summary: dict) -> Path | N
             series_agree[file] = {"top5": round(float(np.nanmean(t)), 3), "all": round(float(np.nanmean(a)), 3)}
 
     # Top-k by rank against the best k-set, from the combination search.
-    names = pd.read_parquet(roster).detector.tolist()
-    vcol = f"vus_{VUS_BUFFER}"
+    # Without it, each series' best single detector only.
     rows = []
-    for shard in shards:
+    if not search:
+        for r in land["rows"]:
+            vals = [(v, d) for v, d in zip(r["vus"], detectors) if v is not None]
+            if vals:
+                v, d = max(vals)
+                rows.append({"file": r["file"], "dataset": r["dataset"], "best1": v, "best1_det": d,
+                             "agree": series_agree.get(r["file"])})
+    names = pd.read_parquet(roster).detector.tolist() if search else []
+    vcol = f"vus_{VUS_BUFFER}"
+    for shard in (shards if search else []):
         f = pd.read_parquet(shard, columns=["filename", "dataset", "k", "d0", "d1", "d2", "n_constant", vcol])
         f = f[f.n_constant == 0]
         for file, g in f.groupby("filename"):
@@ -373,10 +389,11 @@ def export_redundancy(parser: TSBADParser, out: Path, summary: dict) -> Path | N
     for i, d in enumerate(detectors):
         vals = [r["vus"][i] for r in land["rows"] if r["vus"][i] is not None]
         vus_mean.append(round(sum(vals) / len(vals), 4) if vals else None)
-    doc = {"buffer": VUS_BUFFER, "detectors": detectors, "mean_vus": vus_mean, "agree": agree, "examples": examples, "series": rows}
+    doc = {"buffer": land["metrics"]["vus"].get("buffer") if not search else VUS_BUFFER, "detectors": detectors, "mean_vus": vus_mean, "agree": agree, "examples": examples, "series": rows}
     path = out / "redundancy.json"
     path.write_text(json.dumps(doc, separators=(",", ":")))
-    print(f"  redundancy     {len(rows)} series, {len(series_agree)} with agreement, {len(per_dataset)} datasets")
+    print(f"  redundancy     {len(rows)} series, {len(series_agree)} with agreement, {len(per_dataset)} datasets"
+          f"{'' if search else ', no exhaustive search'}")
     return path
 
 
@@ -390,6 +407,9 @@ def main():
     args = ap.parse_args()
 
     parser = TSBADParser(benchmark=args.benchmark, kind=args.kind)
+    if parser.benchmark in TOY:
+        scored = set(parser.load_metrics().get("File Name", []))
+        parser.meta = parser.meta[parser.meta.filename.isin(scored)].reset_index(drop=True)
     out = OUT_ROOT / args.benchmark / args.kind
     summary = export_summary(parser, out)
     for key in ("n_series", "n_datasets", "n_detectors", "n_anomalies", "n_points", "demo_series"):

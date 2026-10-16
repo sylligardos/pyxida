@@ -273,3 +273,16 @@ a.series-name:hover { color: var(--det-soft); text-decoration: underline; }
   .round-screen .grow, .reveal-chart .grow { flex: none; height: max(260px, 50vh); }
   .board-wrap { flex: none; }
 }
+
+/* ---- "How Needle works" ------------------------------------------------- */
+.help-btn { font-family: var(--mono); font-weight: 700; font-size: 15px; }
+.help-modal { align-items: flex-start; padding-top: 8vh; overflow: auto; }
+.help-card { max-width: 640px; text-align: left; border-color: var(--line); gap: 14px; }
+.help-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-head h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--yellow); }
+.help-list { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; }
+.help-list dt { font-weight: 700; color: var(--text); white-space: nowrap; }
+.help-list dd { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+.help-list dd a, .help-refs a { color: var(--det-soft); text-decoration: none; font-family: var(--mono); font-size: 11px; }
+.help-refs { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.help-refs p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-3); }

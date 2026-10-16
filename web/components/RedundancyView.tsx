@@ -46,6 +46,10 @@ const SX0 = 44, SX1 = 332, SY0 = 304, SY1 = 16;
 const sx = (v: number) => SX0 + (SX1 - SX0) * v;
 const sy = (v: number) => SY0 - (SY0 - SY1) * Math.max(0, Math.min(1, v));
 
+// Below this many detectors the matrix leaves no empty corner for the key,
+// so the key goes under it.
+const SMALL_HM = 20;
+
 function mean(xs: number[]) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0; }
 const fmt = (v: number) => v.toFixed(2);
 const signed = (v: number) => `${v >= 0.005 ? "+" : v <= -0.005 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
@@ -92,7 +96,9 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
     return (ex?.pairs[`${Math.min(a, b)}-${Math.max(a, b)}`] ?? []).slice(0, WHERE).map(([i, v]) => ({ file: ex.files[i], v }));
   };
 
-  // Stacking the top k.
+  // Stacking the top k: only where the exhaustive search over pairs and
+  // triplets was run (TSB-AD univariate).
+  const stacking = useMemo(() => data.series.some((s) => s.k2 || s.k3), [data]);
   const key = `k${k}` as const;
   const setName = k === 2 ? "pair" : "triplet";
   const rows = useMemo(() => data.series.filter((s) => s[key] && s[key]!.top !== null), [data, key]);
@@ -144,13 +150,13 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><polyline points="2,4 6,8 10,4" /></svg>
             </div>
           </div>
-          <div className="ctl">
+          {stacking && <div className="ctl">
             <span className="lbl" id="rd-k">Stack</span>
             <div className="seg tall" role="group" aria-labelledby="rd-k">
               <button type="button" aria-pressed={k === 2} onClick={() => { setK(2); setAll(false); }}>Top 2</button>
               <button type="button" aria-pressed={k === 3} onClick={() => { setK(3); setAll(false); }}>Top 3</button>
             </div>
-          </div>
+          </div>}
         </div>
       </section>
 
@@ -159,7 +165,7 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
         <p className="rk-title">Do two detectors flag the same points? <span>Agreement of their rankings on a series, averaged over {scope === "global" ? `${data.series.length} series` : `the ${data.agree.n[scope] ?? 0} series of ${scope}`}. 0 is unrelated, 1 is identical.</span></p>
         <figure className="surface rd-fig" style={{ padding: "22px 24px 18px" }}>
           <div className="rk-scroll">
-            <div className="rd-hm">
+            <div className={data.detectors.length < SMALL_HM ? "rd-hm rd-hm-small" : "rd-hm"}>
               {order.map((a) => (
                 <div key={a} className="rd-hm-row">
                   <span className="rd-hm-lbl rd-hm-rowlbl">{data.detectors[a]}</span>
@@ -230,7 +236,7 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
       </section>
 
       {/* 3. stacking the top k */}
-      <section className="wrap" style={{ paddingBottom: 72, display: "flex", flexDirection: "column", gap: 14 }}>
+      {stacking && <section className="wrap" style={{ paddingBottom: 72, display: "flex", flexDirection: "column", gap: 14 }}>
         <p className="rk-title">So does stacking the top {k} help? <span>The {k} best by rank, averaged, against the single best and against the best {setName} found by trying every {setName}.</span></p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "stretch" }}>
           <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -303,7 +309,7 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
             <button type="button" className="rk-more" onClick={() => setAll((a) => !a)}>{all ? `Show the first ${LIST_ROWS}` : `Show all ${short.length} series`}</button>
           )}
         </div>
-      </section>
+      </section>}
     </>
   );
 }

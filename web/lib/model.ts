@@ -8,8 +8,14 @@ export const YOUR_DATA = "yours";
 export const BENCHMARKS = [
   { id: "tsb-ad", label: "TSB-AD" },
   { id: "tsb-uad", label: "TSB-UAD" },
+  { id: "timeeval", label: "TimeEval (toy)" },
+  { id: "tab", label: "TAB (toy)" },
+  { id: "mtsbench", label: "mTSBench (toy)" },
   { id: YOUR_DATA, label: "Run on your data" },
 ];
+// Toy examples: a few fast detectors on a few datasets, not the full scores.
+export const TOY = new Set(["timeeval", "tab", "mtsbench"]);
+export const isToy = (benchmark: string) => TOY.has(benchmark);
 export const DEFAULT_BENCHMARK = "tsb-ad";
 
 export type State = { benchmark: string; kind: Kind };
@@ -19,6 +25,7 @@ export type Summary = {
   benchmark: string;
   label: string;
   kind: Kind;
+  toy?: boolean;
   n_series: number;
   n_datasets: number;
   n_detectors: number;

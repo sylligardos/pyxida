@@ -55,8 +55,9 @@ function loadDoc(url: string): Promise<SeriesDoc | null> {
 
 // One series as a small polyline with its anomaly windows shaded pink. The
 // file is fetched when the lane scrolls into view.
-function Lane({ url, file, h, big, nameColour, tag, tagColour, bar, barColour, onPick }: {
+function Lane({ url, file, h, big, nameColour, tag, tagColour, bar, barColour, onPick, open }: {
   url: string; file: string; h: number; big: boolean; nameColour: string; tag: string; tagColour: string; bar: number; barColour: string; onPick: () => void;
+  open?: string;   // a link for the name instead of onPick: the selected series opens in the Workbench
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<SeriesDoc | null | undefined>(undefined);
@@ -88,9 +89,15 @@ function Lane({ url, file, h, big, nameColour, tag, tagColour, bar, barColour, o
   return (
     <div ref={ref} className="gr-lane" style={{ background: big ? "rgba(255,225,77,0.05)" : "transparent" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-        <button type="button" className="gr-lk" style={{ flex: "1 1 auto" }} onClick={onPick} aria-label={`Select ${file}`}>
-          <span className="mono ellip" style={{ fontSize: 11, color: nameColour }}>{file}</span>
-        </button>
+        {open ? (
+          <Link href={open} className="gr-lk" style={{ flex: "1 1 auto" }} aria-label={`Open ${file} in the Workbench`}>
+            <span className="mono ellip" style={{ fontSize: 11, color: nameColour }}>{file}</span>
+          </Link>
+        ) : (
+          <button type="button" className="gr-lk" style={{ flex: "1 1 auto" }} onClick={onPick} aria-label={`Select ${file}`}>
+            <span className="mono ellip" style={{ fontSize: 11, color: nameColour }}>{file}</span>
+          </button>
+        )}
         <span className="mono" style={{ fontSize: 11, color: tagColour, whiteSpace: "nowrap" }}>{tag}</span>
         <span style={{ width: 44, height: 4, borderRadius: 2, background: "var(--panel)", overflow: "hidden", display: "block", flex: "0 0 auto" }}>
           <span style={{ display: "block", height: "100%", background: barColour, width: pct(bar) }} />
@@ -143,15 +150,17 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
   const [colour, setColour] = useSessionState<Colour>("graph.colour", "dataset");
   const [height, setHeight] = useSessionState("graph.height", 700);   // of the two panels, dragged at the handle below them
   const [graph, setGraph] = useState<Graph | null | undefined>(undefined);   // undefined: loading
-  const [sel, setSel] = useState<number | null>(null);          // node index
-  const [hood, setHood] = useState<number | null>(null);        // picked neighbourhood
+  // Where the reader is survives a trip to the Workbench and back. Indices
+  // are safe to keep: changing the scope or the metric clears the pick.
+  const [sel, setSel] = useSessionState<number | null>(`graph.sel:${scopeKey}`, null);          // node index
+  const [hood, setHood] = useSessionState<number | null>(`graph.hood:${scopeKey}`, null);       // picked neighbourhood
   const [hoodHover, setHoodHover] = useState<number | null>(null);
-  const [iso, setIso] = useState<string | null>(null);          // isolated legend category
-  const [view, setView] = useState<"nb" | "hood">("nb");
-  const [page, setPage] = useState(0);
+  const [iso, setIso] = useSessionState<string | null>(`graph.iso:${scopeKey}`, null);          // isolated legend category
+  const [view, setView] = useSessionState<"nb" | "hood">(`graph.view:${scopeKey}`, "nb");
+  const [page, setPage] = useSessionState(`graph.page:${scopeKey}`, 0);
   const [hover, setHover] = useState<{ i: number; x: number; y: number; w: number } | null>(null);
   // Zoom and pan as a transform on the drawing group: screen = p * s + t.
-  const [tf, setTf] = useState({ s: 1, tx: 0, ty: 0 });
+  const [tf, setTf] = useSessionState(`graph.tf:${scopeKey}`, { s: 1, tx: 0, ty: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
   const figRef = useRef<HTMLElement>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: boolean } | null>(null);
@@ -168,12 +177,12 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
     return () => { live = false; };
   }, [base]);
 
-  const clearPick = useCallback(() => { setSel(null); setHood(null); setHoodHover(null); setHover(null); setPage(0); }, []);
+  const clearPick = useCallback(() => { setSel(null); setHood(null); setHoodHover(null); setHover(null); setPage(0); }, [setSel, setHood, setPage]);
   const resetZoom = () => setTf({ s: 1, tx: 0, ty: 0 });
   const zoomBy = useCallback((f: number, mx = W / 2, my = H / 2) => setTf((v) => {
     const s = Math.min(40, Math.max(0.25, v.s * f)), k = s / v.s;
     return { s, tx: mx - (mx - v.tx) * k, ty: my - (my - v.ty) * k };
-  }), []);
+  }), [setTf]);
 
   useEffect(() => {
     const el = svgRef.current;
@@ -299,7 +308,7 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
         );
       })}
     </g>
-  ), [nodes, sel, nbSet, hood, hh, isoCat, fill, catOf]);
+  ), [nodes, sel, nbSet, hood, hh, isoCat, fill, catOf, setSel, setIso, setPage]);
 
   // ---- the right column ----
   const selNode = sel !== null ? nodes[sel] ?? null : null;
@@ -355,7 +364,7 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
           {p?.paged && <Pager {...p} />}
         </div>
         <div className="gr-scroll">
-          <Lane url={laneUrl(selNode)} file={selNode.file} h={120} big nameColour="var(--yellow)" tag="selected" tagColour="var(--yellow)" bar={best[0]?.value ?? 0} barColour="var(--det)" onPick={() => {}} />
+          <Lane url={laneUrl(selNode)} file={selNode.file} h={120} big nameColour="var(--yellow)" tag="selected" tagColour="var(--yellow)" bar={best[0]?.value ?? 0} barColour="var(--det)" onPick={() => {}} open={href("/workbench", state, { s: selNode.file })} />
           {inHood
             ? p!.rows.map(hoodLane)
             : nbs.map((e) => {
@@ -363,10 +372,9 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
               return <Lane key={n.file} url={laneUrl(n)} file={n.file} h={52} big={false} nameColour="var(--text)" tag={`${n.m?.dataset ?? "?"} · link ${w.toFixed(2)}`} tagColour="var(--text-3)" bar={w} barColour="var(--yellow)" onPick={() => pickNode(e.j)} />;
             })}
         </div>
-        <div style={{ padding: "10px 20px", borderTop: "1px solid var(--grid)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 11, color: "var(--text-3)" }}>click a name to move there</span>
+        <div style={{ padding: "10px 20px", borderTop: "1px solid var(--grid)", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
           <Link href={href("/workbench", state, { s: selNode.file })} className="gr-btn-soft">
-            Open in the Workbench <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="2" y1="8" x2="13" y2="8" /><polyline points="9,4 13,8 9,12" /></svg>
+            Open this time series in the Workbench <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="2" y1="8" x2="13" y2="8" /><polyline points="9,4 13,8 9,12" /></svg>
           </Link>
         </div>
       </>

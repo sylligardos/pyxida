@@ -180,6 +180,7 @@ async function renderStart() {
         <span style="display:flex;gap:18px;align-items:center">${location.pathname.startsWith('/play') ? '<a class="back-link" href="/">← Back to the demo</a>' : ''}<span style="color:var(--yellow)">Hi-score ${st.hi_score === null || st.hi_score === undefined ? '—' : fmtTot(st.hi_score)}</span></span>
         <span style="color:var(--text-4)">${WORDS[data.round_size].toLowerCase()} series a round</span>
         <span class="top-right"><span style="color:var(--det-soft)">${data.team_size} detectors in the pool</span>
+          <button class="hud-btn help-btn" type="button" id="help" title="How Needle works" aria-label="How Needle works" hidden>?</button>
           <button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
       </div>
       <div class="start-title">
@@ -232,6 +233,12 @@ async function renderStart() {
 
   chart('#attract', { mode: 'thumb', values: attractSeries(), height: 'fill', panel: 'transparent', stroke: '#22D3EE' });
   music.play();
+  loadHelp().then((h) => {
+    const b = app.querySelector('#help');
+    if (!h || !b || S.screen !== 'start') return;
+    b.hidden = false;
+    b.onclick = () => { sfx.play('tick'); showHelp(h); };
+  });
   const input = app.querySelector('#nick');
   input.focus();
   const diff = app.querySelector('#difficulty');
@@ -482,6 +489,38 @@ function seriesLink(src) {
   if (!location.pathname.startsWith('/play')) return `<span class="series-name" title="${esc(src.filename)}">${esc(name)}</span>`;
   const q = new URLSearchParams({ b: src.benchmark || 'tsb-ad', k: 'uni', s: src.filename });
   return `<a class="series-name" href="/workbench?${q}" target="_blank" rel="noopener" title="Open in the Workbench (new tab)">${esc(name)} ↗</a>`;
+}
+
+// "How Needle works": the demo serves the text at /api/help (web/lib/help.ts).
+// On the standalone server there is none, and the button stays hidden.
+let HELP = null;
+async function loadHelp() {
+  if (HELP !== null) return HELP;
+  try {
+    const r = await fetch('/api/help');
+    const d = r.ok ? await r.json() : null;
+    HELP = d && d.help && d.help['/game'] ? { sections: d.help['/game'], cites: d.cites } : false;
+  } catch (e) { HELP = false; }
+  return HELP;
+}
+function showHelp(h) {
+  const used = [...new Set(h.sections.flatMap((sec) => sec.entries.flatMap((e) => e.cites || [])))].sort((a, b) => a - b);
+  const rows = h.sections.flatMap((sec) => sec.entries.map((e) =>
+    `<dt>${esc(e.term)}</dt><dd>${esc(e.text)}${(e.cites || []).map((n) => ` <a href="${esc(h.cites[n].url || '#')}" target="_blank" rel="noopener">[${n}]</a>`).join('')}</dd>`)).join('');
+  const refs = used.map((n) => `<p>[${n}] ${h.cites[n].url ? `<a href="${esc(h.cites[n].url)}" target="_blank" rel="noopener">${esc(h.cites[n].label)}</a>` : esc(h.cites[n].label)}</p>`).join('');
+  const m = document.createElement('div');
+  m.className = 'modal help-modal';
+  m.innerHTML = `<div class="panel modal-card help-card" role="dialog" aria-modal="true" aria-label="How Needle works">
+    <div class="help-head"><h2>HOW NEEDLE WORKS</h2><button class="hud-btn" type="button" id="help-close" aria-label="Close">×</button></div>
+    <dl class="help-list">${rows}</dl>
+    ${refs ? `<div class="help-refs">${refs}</div>` : ''}
+  </div>`;
+  const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });
+  m.querySelector('#help-close').onclick = close;
+  document.addEventListener('keydown', onKey);
+  app.appendChild(m);
 }
 
 // Which sound the Reveal opens with.

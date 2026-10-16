@@ -12,6 +12,7 @@ import { LandscapeView } from "./LandscapeView";
 import { RankingView } from "./RankingView";
 import { RedundancyView } from "./RedundancyView";
 import { Footer } from "./Footer";
+import { ToyNote } from "./ToyNote";
 
 export type ExploreTab = "landscape" | "rankings" | "redundancy";
 export const EXPLORE_TABS: { id: ExploreTab; label: string; takeaway: string }[] = [
@@ -43,6 +44,7 @@ export function ExploreView({ landscape, redundancy, state, initial }: {
             ))}
           </div>
         </section>
+        <ToyNote benchmark={state.benchmark} />
         {view === "landscape" && (landscape
           ? <LandscapeView data={landscape} state={state} />
           : <Notice>No detector metrics exported for this benchmark yet. Run <code className="inline">scripts/export_web.py</code> first.</Notice>)}
@@ -51,7 +53,7 @@ export function ExploreView({ landscape, redundancy, state, initial }: {
           : <Notice>No detector metrics exported for this benchmark yet. Run <code className="inline">scripts/export_web.py</code> first.</Notice>)}
         {view === "redundancy" && (redundancy
           ? <RedundancyView data={redundancy} state={state} />
-          : <Notice>This view reads the exhaustive search over every pair and triplet of detectors, which exists for TSB-AD univariate only. Switch to TSB-AD, univariate, to see it.</Notice>)}
+          : <Notice>No detector agreement exported for this benchmark yet. Run <code className="inline">scripts/export_web.py</code> first.</Notice>)}
       </main>
       <Footer takeaway={tab.takeaway} />
     </>

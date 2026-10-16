@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { WorkbenchView } from "@/components/WorkbenchView";
+import { ToyNote } from "@/components/ToyNote";
 import { href, loadLandscape, loadSummary, stateFrom } from "@/lib/data";
 
 const SAMPLE_MAX_POINTS = 300_000;
@@ -35,6 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
     <>
       <TopBar state={state} current="/workbench" />
       <main style={{ paddingTop: 32 }}>
+        <ToyNote benchmark={state.benchmark} />
         {summary && initial ? (
           <WorkbenchView key={`${state.benchmark}/${state.kind}`} summary={summary} landscape={landscape} state={state} initial={initial} explicit={explicit}
             pin={typeof params.pin === "string" ? params.pin : null} top={typeof params.top === "string" ? params.top : null} avg={typeof params.avg === "string" ? params.avg : null}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BENCHMARKS, KIND_LABEL, KINDS, State, href, hasKind, YOUR_DATA } from "@/lib/data";
 import { BenchmarkSelect } from "./BenchmarkSelect";
+import { HelpButton } from "./HelpButton";
 
 // Three pages. Needle is the bonus: a pill at the right, not a page.
 const PAGES = [
@@ -54,6 +55,7 @@ export async function TopBar({ state, current }: { state: State; current: string
             ))}
           </div>
           <Link href={href("/game", state)} className="pill-needle" aria-current={current === "/game" ? "page" : undefined}>Needle</Link>
+          <HelpButton page={current} />
         </div>
       </div>
     </header>
