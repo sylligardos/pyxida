@@ -89,6 +89,10 @@ def export_summary(parser: TSBADParser, out: Path) -> dict:
     lengths, anomalies = per_series(parser)
     detectors = [d for d in parser.get_detectors() if d not in EXCLUDED.get(parser.benchmark, [])]
     meta = parser.meta
+    channels = {}
+    if parser.kind == "multi":   # the Workbench warns before loading a big series
+        import pandas as pd
+        channels = {f: len(pd.read_csv(parser.raw_path / f, nrows=0).columns) - 1 for f in meta.filename}
     summary = {
         "benchmark": parser.benchmark,
         "label": LABELS.get(parser.benchmark, parser.benchmark),
@@ -103,16 +107,14 @@ def export_summary(parser: TSBADParser, out: Path) -> dict:
         "demo_series": demo_series(parser, lengths),
         "series": [
             {"file": r.filename, "dataset": r.dataset, "type": r.entity_type,
-             "n": lengths.get(r.filename), "anomalies": anomalies.get(r.filename)}
+             "n": lengths.get(r.filename), "anomalies": anomalies.get(r.filename),
+             **({"channels": channels[r.filename]} if channels else {})}
             for r in meta.itertuples()
         ],
     }
     out.mkdir(parents=True, exist_ok=True)
     (out / "summary.json").write_text(json.dumps(summary, separators=(",", ":")))
     return summary
-
-
-MAX_CHANNELS = 8
 
 
 def export_series(parser: TSBADParser, out: Path, filename: str, series=None, labels=None) -> Path:
@@ -125,7 +127,7 @@ def export_series(parser: TSBADParser, out: Path, filename: str, series=None, la
         header = [str(c) for c in pd.read_csv(parser.raw_path / filename, nrows=0).columns[:-1]]
         doc["n_channels"] = int(series.shape[1])
         doc["channels"] = [{"name": header[c] if c < len(header) else f"C{c}", "values": sig(series[:, c])}
-                           for c in range(min(MAX_CHANNELS, series.shape[1]))]
+                           for c in range(series.shape[1])]
     else:
         doc["values"] = sig(series[:, 0] if series.ndim == 2 else series)
     (out / "series").mkdir(parents=True, exist_ok=True)

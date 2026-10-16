@@ -20,7 +20,7 @@ export const DEFAULT_BENCHMARK = "tsb-ad";
 
 export type State = { benchmark: string; kind: Kind };
 
-export type SeriesMeta = { file: string; dataset: string; type: string; n: number | null; anomalies: number | null };
+export type SeriesMeta = { file: string; dataset: string; type: string; n: number | null; anomalies: number | null; channels?: number };
 export type Summary = {
   benchmark: string;
   label: string;

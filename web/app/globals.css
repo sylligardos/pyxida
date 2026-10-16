@@ -264,6 +264,7 @@ code.inline {
 .chip.dashed { border-style: dashed; color: var(--text-3); }
 .chip.on { border-color: var(--yellow); color: var(--yellow); background: rgba(255, 225, 77, 0.10); }
 button.chip[aria-pressed="false"] { color: var(--text-3); }
+.chip.flat { border-style: dashed; opacity: 0.4; }   /* a channel with one value throughout */
 .check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-2); min-height: 44px; }
 .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--yellow); }
 

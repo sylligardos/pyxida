@@ -16,6 +16,7 @@ type Metric = "aucpr" | "vus";
 const MAX_TOP = 6;
 const DEFAULT_TOP = 3;
 const DEFAULT_CHANNELS = 3;
+const WARN_VALUES = 3_000_000;   // channels × points above which the series file is tens of MB
 const DEFAULT_K = 20;
 const MAX_K = 200;
 const SAMPLE_MAX_POINTS = 300_000;
@@ -193,6 +194,9 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
   const pointsAnomalous = doc ? doc.labels.reduce((s, [a, b]) => s + (b - a + 1), 0) : 0;
   const n = doc?.n ?? row?.n ?? 0;
 
+  // Channels with one value throughout: their chips are dimmed, so they can be skipped.
+  const flat = useMemo(() => (doc?.channels ?? []).map(({ values }) => values.every((v) => v === values[0])), [doc]);
+
   const lanes: Lane[] = [];
   if (doc) {
     if (doc.channels) {
@@ -339,7 +343,8 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
           <div className="chips" style={{ alignItems: "center" }}>
             <span className="lbl">Channels ({doc.n_channels} in this series{doc.n_channels! > doc.channels.length ? `, first ${doc.channels.length} exported` : ""})</span>
             {doc.channels.map((c, i) => (
-              <button type="button" key={i} className={`chip${channels.includes(i) ? " on" : ""}`} aria-pressed={channels.includes(i)}
+              <button type="button" key={i} className={`chip${channels.includes(i) ? " on" : ""}${flat[i] ? " flat" : ""}`} aria-pressed={channels.includes(i)}
+                title={flat[i] ? `${c.name}: flat, every value is ${c.values[0]}` : undefined}
                 onClick={() => setChannels(channels.includes(i) ? channels.filter((x) => x !== i) : [...channels, i].sort((a, b) => a - b))}>{c.name}</button>
             ))}
           </div>
@@ -355,7 +360,12 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
                 : <>Could not load {stem(file)} ({loadError}).</>}
             </p>
           ) : (
-            <p className="muted" style={{ padding: 60, textAlign: "center" }}>Loading {stem(file)} …</p>
+            <p className="muted" style={{ padding: 60, textAlign: "center" }}>
+              Loading {stem(file)} …
+              {row?.channels && row.n && row.channels * row.n > WARN_VALUES && (
+                <><br /><span style={{ color: "var(--warn, #FB923C)" }}>This series has {row.channels} channels × {row.n.toLocaleString("en-US")} points, so it may take a while to load.</span></>
+              )}
+            </p>
           )}
           <figcaption className="rk-xlabel">Drag to zoom · double-click to reset</figcaption>
         </figure>

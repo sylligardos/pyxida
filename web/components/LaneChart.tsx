@@ -20,7 +20,9 @@ export type Lane = {
 };
 
 const LABEL_W = 132;
-const SERIES_H = 200;
+const SERIES_H = 200;      // one channel; more channels share SERIES_BUDGET, down to SERIES_MIN_H each
+const SERIES_BUDGET = 320;
+const SERIES_MIN_H = 56;
 const SCORE_H = 78;
 const AXIS_H = 26;
 const COLORS = { line: "#C9C3E6", score: "#22D3EE", lucky: "#FB923C", grid: "#1F1B45", sep: "#2C2754", label: "#FFE14D", text: "#A9A2D4" };
@@ -74,19 +76,27 @@ export function LaneChart({ n, lanes, labels, highlight }: {
   const [view, setView] = useState<View>([-0.5, n - 0.5]);
   const [width, setWidth] = useState(0);
   const [drag, setDrag] = useState<[number, number] | null>(null);
-  const plotRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const canvases = useRef<Map<string, HTMLCanvasElement>>(new Map());
 
   useEffect(() => { setView([-0.5, n - 0.5]); }, [n]);
 
+  // Measured on the whole chart, not on a lane: lanes come and go (a channel
+  // unselected), and an observed lane that leaves would read width 0 for good.
   useEffect(() => {
-    const el = plotRef.current;
+    const el = rootRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const measure = () => setWidth(Math.max(0, el.clientWidth - LABEL_W));
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setWidth(el.clientWidth);
+    measure();
     return () => ro.disconnect();
   }, []);
+
+  const nSeries = lanes.filter((l) => l.kind === "series").length;
+  const seriesH = Math.round(Math.max(SERIES_MIN_H, Math.min(SERIES_H, SERIES_BUDGET / Math.max(1, nSeries))));
+  const laneH = (lane: Lane) => lane.kind === "series" ? seriesH : SCORE_H;
+  const roomy = seriesH >= 120;   // tall series lanes keep the finer grid and padding
 
   const render = useCallback(() => {
     if (!width) return;
@@ -94,7 +104,7 @@ export function LaneChart({ n, lanes, labels, highlight }: {
     for (const lane of lanes) {
       const c = canvases.current.get(lane.id);
       if (!c) continue;
-      const h = lane.kind === "series" ? SERIES_H : SCORE_H;
+      const h = lane.kind === "series" ? seriesH : SCORE_H;
       c.width = Math.round(width * dpr); c.height = Math.round(h * dpr);
       c.style.width = `${width}px`; c.style.height = `${h}px`;
       const ctx = c.getContext("2d");
@@ -102,11 +112,11 @@ export function LaneChart({ n, lanes, labels, highlight }: {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, h);
       ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
-      const rows = lane.kind === "series" ? 4 : 2;
+      const rows = lane.kind === "series" && roomy ? 4 : 2;
       for (let r = 1; r < rows; r++) { const y = (h * r) / rows; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
-      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? COLORS.line : lane.kind === "lucky" ? COLORS.lucky : COLORS.score, lane.kind === "series" ? 10 : 6);
+      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? COLORS.line : lane.kind === "lucky" ? COLORS.lucky : COLORS.score, lane.kind === "series" && roomy ? 10 : 6);
     }
-  }, [lanes, view, width]);
+  }, [lanes, view, width, seriesH, roomy]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -115,12 +125,12 @@ export function LaneChart({ n, lanes, labels, highlight }: {
 
   const onDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    const r = plotRef.current!.getBoundingClientRect();
+    const r = e.currentTarget.getBoundingClientRect();
     setDrag([e.clientX - r.left, e.clientX - r.left]);
   };
   const onMove = (e: React.MouseEvent) => {
     if (!drag) return;
-    const r = plotRef.current!.getBoundingClientRect();
+    const r = e.currentTarget.getBoundingClientRect();   // every lane's plot starts at the same x
     setDrag([drag[0], Math.max(0, Math.min(width, e.clientX - r.left))]);
   };
   const onUp = () => {
@@ -146,12 +156,12 @@ export function LaneChart({ n, lanes, labels, highlight }: {
   const zoomed = view[1] - view[0] < n - 0.01;
 
   return (
-    <div className="lanes" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+    <div ref={rootRef} className="lanes" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {lanes.map((lane, k) => {
-        const h = lane.kind === "series" ? SERIES_H : SCORE_H;
+        const h = laneH(lane);
         return (
           <div key={lane.id} className="lane" style={{ display: "flex", height: h, borderBottom: `1px solid ${COLORS.sep}` }}>
-            <div className="lane-label" style={{ width: LABEL_W, flex: "none", paddingTop: lane.kind === "series" ? 14 : 10, paddingRight: 10, minWidth: 0 }}>
+            <div className="lane-label" style={{ width: LABEL_W, flex: "none", paddingTop: lane.kind === "series" && roomy ? 14 : 10, paddingRight: 10, minWidth: 0 }}>
               {lane.lines ? (
                 <div title={lane.title} style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.25, color: "var(--text)" }}>
                   {lane.lines.map((l, i) => <div key={i} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i ? `+ ${l}` : l}</div>)}
@@ -167,7 +177,6 @@ export function LaneChart({ n, lanes, labels, highlight }: {
               {lane.sub && <div className="mono" style={{ fontSize: 11, color: lane.kind === "series" ? COLORS.label : lane.kind === "lucky" ? COLORS.lucky : "var(--det-soft)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lane.sub}</div>}
             </div>
             <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }}
-              ref={k === 0 ? plotRef : undefined}
               onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onDoubleClick={reset}
               title="Drag to zoom, double-click to reset"
             >
