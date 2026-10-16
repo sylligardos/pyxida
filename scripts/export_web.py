@@ -276,6 +276,7 @@ def weighted_tau(parser: TSBADParser, files: list[str], detectors: list[str]) ->
             out.append(m)
             if i % 50 == 0 or i == len(files):
                 print(f"  weighted tau   {i}/{len(files)}", flush=True)
+    cache.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cache, files=np.array(files), detectors=np.array(detectors), tau=np.stack(out))
     return dict(zip(files, out))
 
