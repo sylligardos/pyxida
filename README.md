@@ -1,4 +1,6 @@
-# Pyxida
+<p align="center"><img src="web/app/icon.svg" alt="Pyxida" width="120"></p>
+
+<h1 align="center">Pyxida</h1>
 
 The demo behind the ICDE 2027 demo paper *Pyxida*: a web app that reads a
 time-series anomaly detection benchmark series by series (which datasets are
