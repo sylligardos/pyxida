@@ -102,7 +102,11 @@ cd web && npm test  # Needle's scoring in TypeScript against the Python one
   https://github.com/TheDatumOrg/TSB-AD
 - VUS-PR: J. Paparrizos, P. Boniol, T. Palpanas, R. S. Tsay, A. Elmore,
   M. J. Franklin. *Volume Under the Surface: A New Accuracy Evaluation Measure
-  for Time-Series Anomaly Detection.* PVLDB 15(11), 2022. The code in
+  for Time-Series Anomaly Detection.* PVLDB 15(11), 2022. And P. Boniol,
+  A. K. Krishna, M. Bruel, Q. Liu, M. Huang, T. Palpanas, R. S. Tsay,
+  A. Elmore, M. J. Franklin, J. Paparrizos. *VUS: Effective and Efficient
+  Accuracy Measures for Time-Series Anomaly Detection.* The VLDB Journal
+  34(3), 2025. The code in
   `scripts/vus.py` is TSB-AD's, under its Apache 2.0 license
   (`scripts/LICENSE-TSB-AD`).
 

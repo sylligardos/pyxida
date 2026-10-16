@@ -17,6 +17,11 @@ References:
     Volume Under the Surface: A New Accuracy Evaluation Measure for Time-Series
     Anomaly Detection. PVLDB 15(11), 2022.
 
+    P. Boniol, A. K. Krishna, M. Bruel, Q. Liu, M. Huang, T. Palpanas,
+    R. S. Tsay, A. Elmore, M. J. Franklin, J. Paparrizos. VUS: Effective and
+    Efficient Accuracy Measures for Time-Series Anomaly Detection. The VLDB
+    Journal 34(3), 2025.
+
     Q. Liu, J. Paparrizos. The Elephant in the Room: Towards A Reliable
     Time-Series Anomaly Detection Benchmark. NeurIPS 2024 (Datasets and
     Benchmarks).
