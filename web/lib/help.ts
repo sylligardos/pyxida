@@ -65,7 +65,7 @@ export const HELP: Record<string, HelpSection[]> = {
     title: "Needle",
     entries: [
       { term: "The opponent", text: "One detector per series: the one with the highest VUS-PR on that series in the benchmark, out of every detector that was run. You go up against the best there is for that series.", cites: [1, 2] },
-      { term: "Its flags", text: "The opponent flags every point where its score rises above its mean plus three standard deviations. Your marks and its flags are judged the same way." },
+      { term: "Its flags", text: "The opponent flags every point where its score rises above a threshold set on that score alone: its mean plus three standard deviations over the window, computed when the series is scored, the same for every detector and every series. Nothing is tuned per detector. Your marks and its flags are judged the same way." },
       { term: "A series", text: "A hit is a labelled anomaly that a mark touches, a false alarm a mark that touches none, a clean decoy a series with no anomaly left unmarked. A mark wider than a tenth of the window is a false alarm whatever it covers." },
       { term: "Round points", text: "A series adds +1 to the round when hits beat false alarms, −1 when they don't, 0 when nothing happened, for you and for the opponent alike. Ten series make a round." },
       { term: "Difficulty", text: "Easy: six easy series, two medium, two decoys, 60 seconds each. Normal: three easy, three medium, two unsolved, two decoys, 45 seconds. Hard: two medium, six unsolved, two decoys, 30 seconds. A series is easy when most detectors reach a VUS-PR of 0.5 on it, unsolved when none does." },
