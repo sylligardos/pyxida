@@ -11,10 +11,11 @@ import { sfx, music, ambient, setMuted } from './sfx.js';
 
 const app = document.getElementById('app');
 const MAX_RANGES = 5;
-// Per-series time limit. The last WARN_S seconds tick quietly, the last
-// HURRY_S faster; at zero the marks are submitted as they stand.
-// ?time=60 in the URL overrides it, to tune at the booth.
-const TIME_LIMIT_S = Number(new URLSearchParams(location.search).get('time')) || 40;
+// Per-series time limit: the server sets it by difficulty (?time= overrides
+// it, for testing). The last WARN_S seconds tick quietly, the last HURRY_S
+// faster; at zero the marks are submitted as they stand.
+const TIME_OVERRIDE_S = Number(new URLSearchParams(location.search).get('time')) || 0;
+const DIFFICULTY_LABEL = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 // Background while marking: march | heartbeat | sonar | drone | muffled | none.
 // ?ambient=sonar in the URL tries another.
 const AMBIENT = new URLSearchParams(location.search).get('ambient') || 'march';
@@ -30,7 +31,10 @@ const TIER_COLOR = { easy: 'var(--det)', medium: 'var(--text)', unsolved: 'var(-
 const S = {
   screen: null,
   nick: '',
-  round: null,      // {id, nick, count, teamSize, idx, results[], values[], labels[], t0}
+  difficulty: 'normal',
+  pack: '',         // the benchmark pack to play; '' = the server's first
+  dataset: '',      // one dataset of that pack; '' = any
+  round: null,      // {id, nick, count, teamSize, timeLimit, idx, results[], values[], labels[], t0}
   live: [],         // charts and timers of the current screen, torn down on change
   pause: null,      // {on, off} while a Round screen's clock can be paused
 };
@@ -160,7 +164,7 @@ function fmtRef(x) {
 // ------------------------------------------------------------------ 1. Start
 
 async function renderStart() {
-  let data = { stats: {}, leaderboard: [], team_size: 5, round_size: 6 };
+  let data = { stats: {}, leaderboard: [], team_size: 5, round_size: 10, difficulties: {}, packs: [] };
   try { data = await api('/api/stats'); } catch (e) { console.warn(e); }
   const st = data.stats;
   const mini = boardRows(data.leaderboard, st.det_avg, 5).map((r) => r.ref
@@ -173,9 +177,9 @@ async function renderStart() {
   show('start', `<div class="page fit start-page">
     <section class="cabinet start-hero">
       <div class="start-top">
-        <span style="color:var(--yellow)">Hi-score ${st.hi_score === null || st.hi_score === undefined ? '—' : fmtTot(st.hi_score)}</span>
-        <span style="color:var(--text-4)">Stage 1 · ${WORDS[data.round_size].toLowerCase()} series</span>
-        <span class="top-right"><span style="color:var(--det-soft)">${data.team_size} detectors</span>
+        <span style="display:flex;gap:18px;align-items:center">${location.pathname.startsWith('/play') ? '<a class="back-link" href="/">← Back to the demo</a>' : ''}<span style="color:var(--yellow)">Hi-score ${st.hi_score === null || st.hi_score === undefined ? '—' : fmtTot(st.hi_score)}</span></span>
+        <span style="color:var(--text-4)">${WORDS[data.round_size].toLowerCase()} series a round</span>
+        <span class="top-right"><span style="color:var(--det-soft)">${data.team_size} detectors in the pool</span>
           <button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
       </div>
       <div class="start-title">
@@ -190,8 +194,8 @@ async function renderStart() {
       <section class="panel">
         <h2 class="eyebrow" style="color:var(--text-4)">How to play</h2>
         <div class="step"><span class="n" style="color:var(--player)">1</span><div><b>MARK</b><span>Drag over anything that looks wrong.</span></div></div>
-        <div class="step"><span class="n" style="color:var(--det)">2</span><div><b>REVEAL</b><span>See the labels and what the detectors flagged.</span></div></div>
-        <div class="step"><span class="n" style="color:var(--yellow)">3</span><div><b>SCORE</b><span>+1 per catch, −1 per false alarm. Beat the detectors.</span></div></div>
+        <div class="step"><span class="n" style="color:var(--det)">2</span><div><b>REVEAL</b><span>See the labels and what the best detector for that series flagged.</span></div></div>
+        <div class="step"><span class="n" style="color:var(--yellow)">3</span><div><b>SCORE</b><span>+1 per catch, −1 per false alarm. Beat the best.</span></div></div>
       </section>
       <section class="panel callout" style="padding:22px;gap:16px;justify-content:center">
         <form class="play-form" id="play">
@@ -199,9 +203,24 @@ async function renderStart() {
             <label for="nick">Enter your name (optional)</label>
             <input id="nick" type="text" maxlength="12" placeholder="AAA" autocomplete="off" spellcheck="false" value="${esc(S.nick)}">
           </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label id="diff-label">Difficulty</label>
+            <div class="choice" role="group" aria-labelledby="diff-label" id="difficulty">
+              ${Object.keys(DIFFICULTY_LABEL).map((d) => `<button type="button" data-d="${d}" aria-pressed="${d === S.difficulty}">${DIFFICULTY_LABEL[d]}<small>${data.difficulties[d]?.time_s ?? '–'} s</small></button>`).join('')}
+            </div>
+          </div>
+          <div class="pick-row">
+            <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+              <label for="pack">Benchmark</label>
+              <select id="pack">${data.packs.map((p) => `<option value="${esc(p.id)}"${p.id === S.pack ? ' selected' : ''}>${esc(p.id.toUpperCase())}</option>`).join('')}</select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+              <label for="dataset">Dataset</label>
+              <select id="dataset"></select>
+            </div>
+          </div>
           <button class="btn btn-primary" type="submit">PRESS PLAY</button>
         </form>
-        <p class="note" style="text-align:center;color:var(--text-4)">Plays are logged anonymously for research. No account, no personal data.</p>
       </section>
       <section class="panel" style="gap:10px">
         <h2 class="eyebrow" style="color:var(--text-4)">High scores</h2>
@@ -215,6 +234,27 @@ async function renderStart() {
   music.play();
   const input = app.querySelector('#nick');
   input.focus();
+  const diff = app.querySelector('#difficulty');
+  diff.onclick = (e) => {
+    const b = e.target.closest('button[data-d]');
+    if (!b) return;
+    S.difficulty = b.dataset.d;
+    sfx.play('tick');
+    for (const x of diff.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+  };
+  const packSel = app.querySelector('#pack'), dsSel = app.querySelector('#dataset');
+  const fillDatasets = () => {
+    const p = data.packs.find((x) => x.id === packSel.value) || data.packs[0];
+    const ds = p ? p.datasets : [];
+    dsSel.innerHTML = `<option value="">Any dataset</option>` + ds.map((d) =>
+      `<option value="${esc(d.id)}"${d.id === S.dataset ? ' selected' : ''}>${esc(d.id)} · ${d.n}</option>`).join('');
+    if (!ds.some((d) => d.id === S.dataset)) { S.dataset = ''; dsSel.value = ''; }
+  };
+  if (!data.packs.some((p) => p.id === S.pack)) S.pack = data.packs[0]?.id ?? '';
+  packSel.value = S.pack;
+  fillDatasets();
+  packSel.onchange = () => { S.pack = packSel.value; S.dataset = ''; sfx.play('tick'); fillDatasets(); };
+  dsSel.onchange = () => { S.dataset = dsSel.value; sfx.play('tick'); };
   app.querySelector('#play').onsubmit = (e) => {
     e.preventDefault();
     S.nick = input.value.trim();
@@ -226,10 +266,11 @@ async function renderStart() {
 // ------------------------------------------------------------------ 2. Round
 
 async function startRound() {
-  const r = await api('/api/round', { nick: S.nick });
+  const r = await api('/api/round', { nick: S.nick, difficulty: S.difficulty, pack: S.pack || undefined, dataset: S.dataset || undefined });
   S.round = {
     id: r.round_id, nick: r.nick, count: r.count, teamSize: r.team_size,
-    idx: 0, results: [], values: [], t0: Date.now(),
+    timeLimit: TIME_OVERRIDE_S || r.time_limit_s || 45, difficulty: r.difficulty,
+    idx: 0, results: [], values: [], opponents: [], t0: Date.now(),
   };
   await renderRound(0);
 }
@@ -237,8 +278,8 @@ async function startRound() {
 function totals(upTo) {
   const res = S.round.results.slice(0, upTo);
   return {
-    you: res.reduce((a, r) => a + r.you.points, 0),
-    det: res.reduce((a, r) => a + r.det.points, 0),
+    you: res.reduce((a, r) => a + r.you.round_points, 0),
+    det: res.reduce((a, r) => a + r.det.round_points, 0),
   };
 }
 
@@ -267,13 +308,13 @@ function hud(idx, { youTotal, detTotal, youDelta, detDelta, clock }) {
     </div>
     <div class="hud-side right">
       <div style="display:flex;flex-direction:column;align-items:flex-end">
-        <span class="hud-who" style="color:var(--det-soft)">Detectors</span>
+        <span class="hud-who hud-opp" style="color:var(--det-soft)">${esc(R.opponents?.[idx]?.name ?? 'Detector')}</span>
         <div style="display:flex;align-items:baseline;gap:8px">
           ${detDelta !== undefined ? `<span class="hud-delta" style="color:var(--det-soft)">${fmtPts(detDelta)}</span>` : ''}
           <span class="hud-score" style="color:var(--det)">${fmtTot(detTotal)}</span>
         </div>
       </div>
-      ${clock ? `<span class="clock" id="clock">${mmss(TIME_LIMIT_S * 1000)}</span>` : ''}
+      ${clock ? `<span class="clock" id="clock">${mmss(R.timeLimit * 1000)}</span>` : ''}
     </div>
   </header>`;
 }
@@ -319,6 +360,10 @@ async function renderRound(idx) {
   </div>`);
 
   const data = await api(`/api/round/${R.id}/${idx}`);
+  R.opponents[idx] = data.opponent || null;
+  if (S.screen !== 'round' || R.idx !== idx) return;
+  const oppEl = app.querySelector('.hud-opp');
+  if (oppEl && data.opponent) oppEl.textContent = data.opponent.name;
   if (S.screen !== 'round' || R.idx !== idx) return;
   R.values[idx] = data.values;
   app.querySelector('#sid').textContent = data.label;
@@ -337,7 +382,7 @@ async function renderRound(idx) {
     },
   };
   const clock = app.querySelector('#clock');
-  clock.textContent = mmss(TIME_LIMIT_S * 1000);
+  clock.textContent = mmss(R.timeLimit * 1000);
   let marks = 0;
 
   const zoom = app.querySelector('#zoom');
@@ -352,6 +397,13 @@ async function renderRound(idx) {
     onLimit: () => {
       sfx.play('limit');
       const h = app.querySelector('#hint');
+      h.classList.remove('shake'); void h.offsetWidth; h.classList.add('shake');
+    },
+    onWide: () => {
+      sfx.play('limit');
+      const h = app.querySelector('#hint'), sub = app.querySelector('#subhint');
+      h.textContent = 'TOO WIDE'; h.classList.add('warn');
+      sub.textContent = 'A mark covers at most a tenth of the series.';
       h.classList.remove('shake'); void h.offsetWidth; h.classList.add('shake');
     },
     onView: (v) => {
@@ -374,7 +426,7 @@ async function renderRound(idx) {
     hint.classList.toggle('warn', full);
     sub.textContent = full ? 'Remove one to mark another.'
       : k === 0 ? 'Nothing off? Hit Nothing here.'
-        : `${MAX_RANGES - k} left. Zoom in to catch single points.`;
+        : `${MAX_RANGES - k} left. A mark covers at most a tenth of the series.`;
     app.querySelector('#submit').disabled = k === 0;
   };
   updateMarks([]);
@@ -404,8 +456,8 @@ async function renderRound(idx) {
   ambient.start(AMBIENT);
   every(200, () => {
     if (sent || pausedAt !== null) return;
-    const left = Math.max(0, TIME_LIMIT_S * 1000 - elapsed());
-    ambient.update(1 - left / (TIME_LIMIT_S * 1000));
+    const left = Math.max(0, R.timeLimit * 1000 - elapsed());
+    ambient.update(1 - left / (R.timeLimit * 1000));
     const sec = Math.ceil(left / 1000);
     clock.textContent = mmss(sec * 1000);
     clock.classList.toggle('warn', sec <= WARN_S);
@@ -421,6 +473,15 @@ async function renderRound(idx) {
       go(false, true).catch(fail);
     }
   });
+}
+
+// The benchmark file behind a window, linked into the Workbench when the
+// game runs inside the demo (under /play); plain text on the standalone server.
+function seriesLink(src) {
+  const name = String(src.filename).replace(/\.csv$/, '');
+  if (!location.pathname.startsWith('/play')) return `<span class="series-name" title="${esc(src.filename)}">${esc(name)}</span>`;
+  const q = new URLSearchParams({ b: src.benchmark || 'tsb-ad', k: 'uni', s: src.filename });
+  return `<a class="series-name" href="/workbench?${q}" target="_blank" rel="noopener" title="Open in the Workbench (new tab)">${esc(name)} ↗</a>`;
 }
 
 // Which sound the Reveal opens with.
@@ -442,9 +503,17 @@ function renderReveal(idx) {
       + row('Empty decoy', P.you.clean ? '+1' : '0', P.det.clean ? '+1' : '0')
     : row('Hits', P.you.hits, P.det.hits) + row('False alarms', P.you.false_alarms, P.det.false_alarms);
   const last = idx + 1 >= R.count;
+  // The opponent card: the best detector on this series, and what it did.
+  const O = P.opponent || { name: 'Detectors', pool: P.detectors.length };
+  const d0 = P.detectors[0] || { flags: [], caught: false };
+  const did = decoy
+    ? (d0.flags.length ? `took the bait: ${d0.flags.length} false alarm${d0.flags.length > 1 ? 's' : ''}` : 'left it alone')
+    : (d0.caught ? 'crossed its line on the anomaly' : (d0.flags.length ? 'flagged elsewhere' : 'stayed under its line'));
+  const good = decoy ? d0.flags.length === 0 : d0.caught;
+  const vus = typeof O.vus_pr === 'number' && isFinite(O.vus_pr) ? O.vus_pr.toFixed(2) : null;
 
   show('reveal', `<div class="page fit reveal-page">
-    ${hud(idx, { youTotal: t.you, detTotal: t.det, youDelta: P.you.points, detDelta: P.det.points })}
+    ${hud(idx, { youTotal: t.you, detTotal: t.det, youDelta: P.you.round_points, detDelta: P.det.round_points })}
     <div class="reveal-head">
       <div class="left">
         <div class="tier-row"><span class="tier tier-${P.tier}">${P.tier.toUpperCase()}</span><span class="tier-note">${esc(P.tier_note)}</span></div>
@@ -454,33 +523,34 @@ function renderReveal(idx) {
       <div class="layers" role="group" aria-label="Layers">
         <button class="layer" type="button" aria-pressed="true" data-layer="label" style="--c:var(--yellow);--f:rgba(255,225,77,0.10)"><i></i>Label</button>
         <button class="layer" type="button" aria-pressed="true" data-layer="you" style="--c:var(--player);--f:rgba(255,61,154,0.10)"><i></i>You</button>
-        <button class="layer" type="button" aria-pressed="true" data-layer="det" style="--c:var(--det);--f:rgba(34,211,238,0.10)"><i></i>Detectors</button>
+        <button class="layer" type="button" aria-pressed="true" data-layer="det" style="--c:var(--det);--f:rgba(34,211,238,0.10)"><i></i>${esc(O.name)}</button>
       </div>
     </div>
     <section class="cabinet reveal-chart"><div id="chart" class="grow"></div></section>
     <div class="panels">
       <section class="panel">
-        <h2 class="eyebrow">${esc(P.label)}</h2>
+        <h2 class="eyebrow">${esc(P.label)}${P.source && P.source.filename ? ` · ${seriesLink(P.source)}` : ''}</h2>
         <div class="tally">
           <span></span><span class="h" style="color:var(--player)">YOU</span><span class="h" style="color:var(--det)">DETECTORS</span>
           ${rows}
-          <span class="tot-l">Points</span>
-          <span class="tot" style="color:var(--player)">${fmtPts(P.you.points)}</span>
-          <span class="tot" style="color:var(--det)">${fmtPts(P.det.points)}</span>
+          <span class="tot-l">This series</span>
+          <span class="tot" style="color:var(--player)">${fmtPts(P.you.round_points)}</span>
+          <span class="tot" style="color:var(--det)">${fmtPts(P.det.round_points)}</span>
         </div>
-        <p class="note">Hit +1, false alarm −1, empty decoy +1. ${P.team_score
-          ? 'The detectors flag wherever their average score crosses its dashed line (mean + 3 std).'
-          : 'Each detector flags wherever its score crosses its dashed line (mean + 3 std); their flags count together.'}</p>
+        <p class="note">A series counts +1 when hits beat false alarms, −1 when they don't, 0 when nothing happened. ${esc(O.name)} flags wherever its score crosses its dashed line (mean + 3 std).</p>
       </section>
       <section class="panel callout ask">
-        <h2>NOW THAT YOU’VE SEEN IT</h2>
-        <div class="answers">
-          <button class="answer" type="button" aria-pressed="false" data-a="see"><span class="diamond"></span>I see it now</button>
-          <button class="answer" type="button" aria-pressed="false" data-a="cannot"><span class="diamond"></span>I still cannot see it</button>
-          <button class="answer" type="button" aria-pressed="false" data-a="else"><span class="diamond"></span>I think something else is the anomaly</button>
+        <!-- The "Now that you've seen it" question lived here (see, cannot,
+             else -> /feedback). Removed 2026-10-16: nothing used the answers
+             yet, and the box raised questions at the booth. The API and the
+             feedback table stay, so it can come back as it was. -->
+        <h2>YOUR OPPONENT</h2>
+        <div class="opp-card${good ? ' on' : ''}">
+          <span class="opp-name">${esc(O.name)}</span>
+          <span class="opp-sub">${O.pool ? `The best of ${O.pool} detectors on this series` : 'The best detector on this series'}${vus ? ` · VUS-PR ${vus}` : ''}</span>
+          <span class="opp-did"><span class="diamond"></span>${esc(did)}</span>
         </div>
-        <p class="else-note" id="else-note" hidden>Your ranges stay lit, so we know which region you mean.</p>
-        <div class="next-row"><span id="next-hint">Optional. It helps the research.</span>
+        <div class="next-row"><span id="next-hint"></span>
           <button class="btn btn-primary" type="button" id="next">${last ? 'RESULTS' : 'NEXT'}</button></div>
       </section>
     </div>
@@ -489,7 +559,9 @@ function renderReveal(idx) {
   const c = chart('#chart', {
     mode: 'reveal', values: R.values[idx], height: 'fill',
     labels: P.labels, ranges: P.ranges, detRanges: P.det_ranges, detectors: P.detectors,
-    team: P.team_score ? { score: P.team_score, threshold: P.team_threshold, flags: P.det_ranges } : null,
+    // With one opponent its own lane is the scored one; the team-average lane
+    // only exists when a pack still holds several detectors.
+    team: P.team_score && P.detectors.length > 1 ? { score: P.team_score, threshold: P.team_threshold, flags: P.det_ranges } : null,
   });
   const wrap = () => c.wrap;
   setTimeout(() => { if (S.screen === 'reveal') sfx.play(revealSound(P)); }, 200);
@@ -503,21 +575,6 @@ function renderReveal(idx) {
   });
 
   const next = app.querySelector('#next');
-  app.querySelectorAll('.answer').forEach((b) => {
-    b.onclick = async () => {
-      sfx.play('tick');
-      app.querySelectorAll('.answer').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      const isElse = b.dataset.a === 'else';
-      app.querySelector('#else-note').hidden = !isElse;
-      if (isElse) {
-        const you = app.querySelector('.layer[data-layer="you"]');
-        you.setAttribute('aria-pressed', 'true');
-        wrap().classList.remove('hide-you');
-      }
-      app.querySelector('#next-hint').textContent = 'Logged. Thanks!';
-      try { await api(`/api/round/${R.id}/${idx}/feedback`, { answer: b.dataset.a }); } catch (e) { console.warn(e); }
-    };
-  });
   next.onclick = () => {
     sfx.play('tick');
     next.disabled = true;
@@ -572,8 +629,8 @@ function renderSummary() {
         <div class="card-id"><span>${esc(P.label)}</span><span class="tier sm tier-${P.tier}">${P.tier.toUpperCase()}</span></div>
         <div id="thumb-${k}"></div>
         <div class="res-rows">
-          ${res('YOU', P.you_result, P.you_text, P.you.points, 'var(--player)', 'rgba(255,61,154,0.16)', o === 'you' || o === 'both')}
-          ${res('DETECTORS', P.det_result, P.det_text, P.det.points, 'var(--det)', 'rgba(34,211,238,0.14)', o === 'det' || o === 'both')}
+          ${res('YOU', P.you_result, P.you_text, P.you.round_points, 'var(--player)', 'rgba(255,61,154,0.16)', o === 'you' || o === 'both')}
+          ${res(P.opponent ? P.opponent.name.toUpperCase() : 'DETECTORS', P.det_result, P.det_text, P.det.round_points, 'var(--det)', 'rgba(34,211,238,0.14)', o === 'det' || o === 'both')}
         </div>
       </div>
     </article>`;
@@ -596,13 +653,13 @@ function renderSummary() {
       </div>
       <div class="vs"><b>VS</b><span>${W} W · ${L} L · ${T} T</span></div>
       <div class="side${det > you ? ' win' : ''}" style="--c:var(--det);--f:rgba(34,211,238,0.06);--g:rgba(34,211,238,0.3);--s:var(--det-soft)">
-        <span class="who">Team of ${R.teamSize}</span><span class="big">${fmtTot(det)}</span><span class="lbl">DETECTORS</span>
+        <span class="who">The best detector, each series</span><span class="big">${fmtTot(det)}</span><span class="lbl">DETECTORS</span>
       </div>
     </div>
     <p class="tiers-line">You played ${tierLine}.</p>
     <div class="cards">${cards}</div>
     <div class="sum-foot">
-      <p>+1 found it or left a decoy clean · 0 missed · −1 false alarm</p>
+      <p>Each series counts +1, 0 or −1: hits against false alarms, a clean decoy counts as a hit</p>
       <div class="actions">
         <button class="btn btn-outline" type="button" id="board">LEADERBOARD</button>
         <button class="btn btn-primary" type="button" id="again">PLAY AGAIN</button>

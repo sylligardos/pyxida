@@ -46,23 +46,38 @@ from store import Store  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WEB = Path(__file__).resolve().parent / "web"
 
-# One round: two easy, two medium, one unsolved, one decoy, in random order.
-ROUND_MIX = ["easy", "easy", "medium", "medium", "unsolved", "decoy"]
+# A round is ten series in random order; the difficulty sets the mix of
+# tiers and the seconds per series (web/lib/game/pack.ts has the same table).
+DIFFICULTIES = {
+    "easy": {"mix": ["easy"] * 6 + ["medium"] * 2 + ["decoy"] * 2, "time_s": 60},
+    "normal": {"mix": ["easy"] * 3 + ["medium"] * 3 + ["unsolved"] * 2 + ["decoy"] * 2, "time_s": 45},
+    "hard": {"mix": ["medium"] * 2 + ["unsolved"] * 6 + ["decoy"] * 2, "time_s": 30},
+}
+DEFAULT_DIFFICULTY = "normal"
+ROUND_MIX = DIFFICULTIES[DEFAULT_DIFFICULTY]["mix"]
 
 TIER_NOTE = {
-    "easy": "Most of the detector team catches this one.",
+    "easy": "Most detectors catch this one.",
     "medium": "Only some detectors catch this one.",
-    "unsolved": "Even the best detector in the benchmark misses this one.",
+    "unsolved": "No detector in the benchmark gets this one. You face the best of them.",
     "decoy": "Some series are clean on purpose.",
 }
+
+
+def opponent_of(s) -> dict:
+    """The opponent card: from the pack when the builder wrote it, else the
+    first detector."""
+    return s.source.get("opponent") or {"name": s.detectors[0]["name"] if s.detectors else "Detectors",
+                                        "vus_pr": None, "rank": 0, "pool": len(s.detectors)}
 
 ANSWERS = {"see", "cannot", "else"}
 
 
-def pick_round(pack: Pack, rng: random.Random, mix=ROUND_MIX) -> list[int]:
-    """One series per slot of the mix, no repeats. A tier that runs short is
-    filled from whatever is left, so a small pack still plays."""
-    pool = {t: rng.sample(ids, len(ids)) for t, ids in pack.by_tier().items()}
+def pick_round(pack: Pack, rng: random.Random, mix=ROUND_MIX, dataset: str | None = None) -> list[int]:
+    """One series per slot of the mix, no repeats, from one dataset when
+    asked. A tier that runs short is filled from whatever is left, so a
+    small pack (or dataset) still plays."""
+    pool = {t: rng.sample(ids, len(ids)) for t, ids in pack.by_tier(dataset).items()}
     chosen = []
     for tier in mix:
         if pool.get(tier):
@@ -80,8 +95,11 @@ def clean_nick(nick) -> str:
     return nick or "ANON"
 
 
-def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: int | None = None):
-    pack = load_pack(pack_path)
+def create_app(pack_path: Path | list[Path], db_path: Path, today_only: bool = True, seed: int | None = None):
+    # One pack per benchmark, keyed by folder name; the first is the default.
+    paths = pack_path if isinstance(pack_path, list) else [pack_path]
+    packs = {Path(p).name: load_pack(p) for p in paths}
+    pack = next(iter(packs.values()))
     store = Store(db_path)
     rng = random.Random(seed)
 
@@ -89,12 +107,14 @@ def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: in
         row = store.db.execute("SELECT * FROM rounds WHERE id = ?", (rid,)).fetchone()
         if row is None:
             raise HTTPException(404, "No such round")
-        return {"id": rid, "nick": row["nick"], "series": json.loads(row["series"])}
+        if row["pack"] not in packs:
+            raise HTTPException(404, f"The pack of this round ({row['pack']}) is not loaded")
+        return {"id": rid, "nick": row["nick"], "pack": packs[row["pack"]], "series": json.loads(row["series"])}
 
     def get_series(rnd: dict, idx: int):
         if not 0 <= idx < len(rnd["series"]):
             raise HTTPException(404, "No such series in this round")
-        return pack.series[rnd["series"][idx]]
+        return rnd["pack"].series[rnd["series"][idx]]
 
     async def body(request: Request) -> dict:
         try:
@@ -111,6 +131,9 @@ def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: in
             "leaderboard": store.leaderboard(8, today_only),
             "team_size": len(pack.detectors),
             "round_size": len(ROUND_MIX),
+            "packs": [{"id": k, "name": p.name, "team": p.detectors, "datasets": p.datasets(len(ROUND_MIX))}
+                      for k, p in packs.items()],
+            "difficulties": {k: {"count": len(v["mix"]), "time_s": v["time_s"]} for k, v in DIFFICULTIES.items()},
         }
 
     async def stats(request: Request):
@@ -120,16 +143,25 @@ def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: in
         data = await body(request)
         rid = uuid.uuid4().hex
         nick = clean_nick(data.get("nick"))
-        series = pick_round(pack, rng)
-        store.new_round(rid, nick, pack.name, series)
+        difficulty = data.get("difficulty") if data.get("difficulty") in DIFFICULTIES else DEFAULT_DIFFICULTY
+        key = data.get("pack") if data.get("pack") in packs else next(iter(packs))
+        chosen = packs[key]
+        dataset = data.get("dataset") or None
+        if dataset and dataset not in {d["id"] for d in chosen.datasets(len(ROUND_MIX))}:
+            raise HTTPException(400, f"No dataset {dataset} in {key}")
+        series = pick_round(chosen, rng, DIFFICULTIES[difficulty]["mix"], dataset)
+        store.new_round(rid, nick, key, series, difficulty)
         return JSONResponse({"round_id": rid, "nick": nick, "count": len(series),
-                             "team_size": len(pack.detectors)})
+                             "team_size": len(chosen.detectors), "difficulty": difficulty,
+                             "time_limit_s": DIFFICULTIES[difficulty]["time_s"],
+                             "pack": key, "dataset": dataset})
 
     async def series(request: Request):
         rnd = get_round(request.path_params["rid"])
         idx = request.path_params["idx"]
         s = get_series(rnd, idx)
-        return JSONResponse({"idx": idx, "label": f"SERIES {s.id}", "n": s.n, "values": s.values})
+        return JSONResponse({"idx": idx, "label": f"SERIES {s.id}", "n": s.n, "values": s.values,
+                             "opponent": opponent_of(s)})
 
     async def submit(request: Request):
         rnd = get_round(request.path_params["rid"])
@@ -155,11 +187,14 @@ def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: in
         return JSONResponse({
             "idx": idx, "label": f"SERIES {s.id}", "n": s.n,
             "tier": s.tier, "tier_note": TIER_NOTE[s.tier],
+            "opponent": opponent_of(s),
             "labels": s.labels,
             "team_score": result["team_score"], "team_threshold": result["team_threshold"],
             "ranges": result["ranges"], "det_ranges": result["det_ranges"],
-            "you": {k: you[k] for k in ("hits", "false_alarms", "missed", "clean", "points")},
-            "det": {k: det[k] for k in ("hits", "false_alarms", "missed", "clean", "points")},
+            "you": {k: you[k] for k in ("hits", "false_alarms", "missed", "clean", "points", "round_points", "too_wide")},
+            "det": {k: det[k] for k in ("hits", "false_alarms", "missed", "clean", "points", "round_points", "too_wide")},
+            # Only after the reveal: the benchmark file name gives the anomaly away.
+            "source": {k: s.source.get(k) for k in ("benchmark", "filename", "start", "end")},
             "you_hits": you["label_hits"], "det_hits": det["label_hits"],
             "outcome": result["outcome"],
             "you_result": result["you_result"], "det_result": result["det_result"],
@@ -214,7 +249,8 @@ def create_app(pack_path: Path, db_path: Path, today_only: bool = True, seed: in
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pack", type=Path, default=REPO_ROOT / "data" / "game" / "dev")
+    ap.add_argument("--pack", type=Path, nargs="+", default=[REPO_ROOT / "data" / "game" / "dev"],
+                    help="one or more pack folders; the first is the default")
     ap.add_argument("--db", type=Path, default=REPO_ROOT / "data" / "game" / "plays.sqlite")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8000)

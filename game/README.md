@@ -145,13 +145,58 @@ API on it. `check_pack.py` on that pack found:
 - Unsolved series are almost all UCR: one long anomaly (median 360 points)
   in a 10 000 point window of a periodic signal.
 
+**Done 2026-10-15** (both servers, with tests):
+
+- **Width cap.** A mark wider than a tenth of the window is a false alarm
+  whatever it covers (`MAX_RANGE_FRACTION`, `too_wide` in the evaluation);
+  the detectors' flags are held to the same cap. The chart stops the drag
+  at the cap and undoes an edit whose merge would exceed it. This closes
+  the "mark the whole series" cheat.
+- **Difficulty.** Ten series a round. Easy: 6 easy, 2 medium, 2 decoys,
+  60 s each. Normal: 3 easy, 3 medium, 2 unsolved, 2 decoys, 45 s. Hard:
+  2 medium, 6 unsolved, 2 decoys, 30 s. The round reply carries
+  `time_limit_s`; `?time=` still overrides it. `rounds.difficulty` is
+  stored (the column is added to older logs on open).
+- **Benchmark and dataset.** One pack per benchmark under
+  `data/game/<pack>/`; the manifest names each series' dataset. The Start
+  screen offers the packs and, per pack, the datasets with at least ten
+  series. The Next server reads the manifests at start and a series when a
+  round needs it; `server.py --pack a b` loads several. Packs rebuilt with
+  `--per-tier 100`: `tsb-ad` (357 series; tiers from the divergence CSV)
+  and `tsb-uad` (400; team NORMA MP LOF PCA POLY, the top five by mean
+  VUS-PR; tiers from the metrics at 0.5).
+
+**Done 2026-10-16: one opponent per series.** The player no longer faces a
+team average. Each series' opponent is the best detector on that series in
+the benchmark, by VUS-PR from the metric files, out of the whole pool (40
+for TSB-AD, 12 for TSB-UAD). `build_pack.py` stores only that detector's
+score, with `source.opponent = {name, vus_pr, rank, pool}`; `--detectors`
+now only narrows the pool. The HUD, the Reveal (an opponent card where
+the question used to be) and the verdict words name the opponent. The
+scoring code is unchanged (one detector averages to itself); with several
+detectors it still says "the detectors". `DETECTOR_RULE` and the pooled
+rule remain for that case. Also: windows with more than 10% anomalous
+points are passed over (`--max-anomalous`), since no mark under the width
+cap could cover them; the Start screen links back to the demo.
+
+**Done 2026-10-16, later.** A series adds **+1, 0 or -1 to the round**
+(`round_points`, the sign of its points): hits against false alarms, so an
+opponent with fifty false alarms loses that series, not the round. The
+outcome (W/L/T) compares round points, so two negative scores tie. The HUD,
+tallies, summary cards and the stored totals use round points; the raw
+hits and false alarms stay in the log. Also: the Reveal shows the benchmark
+file name, linked into the Workbench (new tab) when the game runs under
+/play; the team-average lane is gone (one opponent, one lane); the summary
+grid is five cards a row; the Start screen no longer says plays are logged
+for research. Every finished round is appended to `data/game/plays.csv`
+next to the SQLite log (one line per series), by both servers.
+
 **Open, in order:**
 
-1. Decide the detectors' rule from the table above (and whether the Reveal's
-   tier notes should talk about VUS-PR or about the game's flags).
-2. Game modes and choosing a specific dataset: the author wants to go back to
-   design first. Discuss before building.
-3. The design's open items: a summary card for several anomalies (moot
+1. Decide the opponent's threshold (mean + 3 std today; the table above
+   was measured on the five-detector team, so remeasure with
+   `check_pack.py` on the new packs).
+2. The design's open items: a summary card for several anomalies (moot
    while `--max-labels 1`), light mode, motion.
 
 **Decisions so far:**
@@ -161,7 +206,7 @@ API on it. `check_pack.py` on that pack found:
   less clean (the detectors' false alarms pile up and they lose almost every
   round). The author may switch again, which is why `DETECTOR_RULE` exists.
 - The player marks freely, but the UI caps them at five ranges.
-- The "Now that you've seen it" question is optional; never force it.
+- The "Now that you've seen it" question was optional, never forced; removed from the Reveal on 2026-10-16 (nothing used the answers yet). The API and the feedback table stay.
 - Arcade look from the design comps (magenta = player, cyan = detectors,
   yellow = labels). Say "detectors", never "CPU".
 - Every screen fits one viewport on desktop sizes; no page scroll.

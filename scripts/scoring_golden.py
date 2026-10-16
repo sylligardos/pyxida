@@ -32,6 +32,9 @@ def cases(s):
         yield "label+fa", [[max(0, a - 3), b + 3], [n // 2, n // 2 + 5], [1, 2]]
         yield "near", [[b + 20, b + 60]]
     yield "overlap", [[0, 5], [3, 9], [9.4, 12.6]]
+    yield "whole", [[0, n - 1]]
+    yield "just wide", [[0, n // 10]]
+    yield "just fits", [[0, n // 10 - 1]]
 
 
 def main():
@@ -42,6 +45,9 @@ def main():
         for name, ranges in cases(s):
             out.append({"id": sid, "case": name, "ranges": ranges,
                         "result": score_series(ranges, s.labels, s.detectors, s.n)})
+            # The real packs hold one opponent per series: the same case, solo.
+            out.append({"id": sid, "case": name + " solo", "ranges": ranges, "solo": True,
+                        "result": score_series(ranges, s.labels, s.detectors[:1], s.n)})
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, separators=(",", ":")))
     print(f"{len(out)} cases -> {OUT}")

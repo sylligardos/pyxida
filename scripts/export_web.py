@@ -271,7 +271,7 @@ def weighted_tau(parser: TSBADParser, files: list[str], detectors: list[str]) ->
     return dict(zip(files, out))
 
 
-EXAMPLES = 6   # per dataset, the series and pairs with the highest weighted tau
+EXAMPLES = 3   # per dataset and pair, the series with the highest weighted tau
 
 
 def export_redundancy(parser: TSBADParser, out: Path, summary: dict) -> Path | None:
@@ -311,23 +311,21 @@ def export_redundancy(parser: TSBADParser, out: Path, summary: dict) -> Path | N
     agree = {"global": clean(global_mat), "datasets": {ds: clean(m) for ds, m in per_dataset.items()},
              "n": {ds: len(ms) for ds, ms in by_ds.items()}}
 
-    # Concrete cases per dataset: the highest (series, pair) values, one per
-    # series and at most two per pair, so one family does not fill the list.
+    # Concrete cases per dataset: for every pair, the series where it agrees
+    # most. Compact: the dataset's file names once, then per pair "a-b"
+    # (a < b) a list of [file index, tau].
     iu = np.triu_indices(nd, 1)
     examples = {}
     for ds in by_ds:
-        cand = sorted(((float(tau[r["file"]][a, b]), r["file"], int(a), int(b))
-                       for r in land["rows"] if r["dataset"] == ds for a, b in zip(*iu)
-                       if np.isfinite(tau[r["file"]][a, b])), reverse=True)
-        picked, seen_file, per_pair = [], set(), Counter()
-        for v, f, a, b in cand:
-            if f in seen_file or per_pair[(a, b)] >= 2:
-                continue
-            picked.append({"file": f, "a": a, "b": b, "v": round(v, 3)})
-            seen_file.add(f); per_pair[(a, b)] += 1
-            if len(picked) == EXAMPLES:
-                break
-        examples[ds] = picked
+        files = [r["file"] for r in land["rows"] if r["dataset"] == ds]
+        stack = np.stack([tau[f] for f in files])
+        pairs = {}
+        for a, b in zip(*iu):
+            col = stack[:, a, b]
+            idx = [int(i) for i in np.argsort(-np.nan_to_num(col, nan=-np.inf), kind="stable") if np.isfinite(col[i])][:EXAMPLES]
+            if idx:
+                pairs[f"{a}-{b}"] = [[i, round(float(col[i]), 2)] for i in idx]
+        examples[ds] = {"files": files, "pairs": pairs}
 
     rank_on = {r["file"]: np.argsort([-(v if v is not None else -1.0) for v in r["vus"]]) for r in land["rows"]}
     series_agree = {}

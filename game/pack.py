@@ -49,11 +49,22 @@ class Pack:
     detectors: list[str]
     series: dict[int, Series]
 
-    def by_tier(self) -> dict[str, list[int]]:
+    def by_tier(self, dataset: str | None = None) -> dict[str, list[int]]:
         out = {t: [] for t in TIERS}
         for s in self.series.values():
+            if dataset and dataset_of(s.source.get("filename", "")) != dataset:
+                continue
             out.setdefault(s.tier, []).append(s.id)
         return out
+
+    def datasets(self, at_least: int = 10) -> list[dict]:
+        """The datasets with enough series for a round, biggest first."""
+        n: dict[str, int] = {}
+        for s in self.series.values():
+            d = dataset_of(s.source.get("filename", ""))
+            if d:
+                n[d] = n.get(d, 0) + 1
+        return [{"id": d, "n": k} for d, k in sorted(n.items(), key=lambda x: (-x[1], x[0])) if k >= at_least]
 
 
 def load_pack(path: str | Path) -> Pack:
@@ -74,6 +85,13 @@ def load_pack(path: str | Path) -> Pack:
     return Pack(name=manifest.get("name", path.name), detectors=manifest["detectors"], series=series)
 
 
+def dataset_of(filename: str) -> str:
+    """The dataset a benchmark file comes from: 0001_Daphnet_id_1_... -> Daphnet.
+    The Start screen offers the datasets with enough series for a round."""
+    parts = Path(filename).stem.split("_")
+    return parts[1] if len(parts) > 1 else ""
+
+
 def write_pack(path: str | Path, name: str, detectors: list[str], series: list[Series]) -> Path:
     path = Path(path)
     (path / "series").mkdir(parents=True, exist_ok=True)
@@ -81,7 +99,8 @@ def write_pack(path: str | Path, name: str, detectors: list[str], series: list[S
     for s in series:
         file = f"series/{s.id}.json"
         (path / file).write_text(json.dumps(asdict(s), separators=(",", ":")))
-        entries.append({"id": s.id, "tier": s.tier, "n": s.n, "file": file})
+        entries.append({"id": s.id, "tier": s.tier, "n": s.n, "file": file,
+                        "dataset": dataset_of(s.source.get("filename", ""))})
     manifest = {"name": name, "created": date.today().isoformat(),
                 "detectors": detectors, "series": entries}
     (path / "manifest.json").write_text(json.dumps(manifest, indent=1))

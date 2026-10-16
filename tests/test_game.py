@@ -13,7 +13,7 @@ GAME = Path(__file__).resolve().parents[1] / "game"
 sys.path.insert(0, str(GAME))
 
 from scoring import (clean_ranges, detector_caught, evaluate, labels_to_ranges,  # noqa: E402
-                     result_key, score_series, threshold_ranges)
+                     outcome, result_key, result_text, score_series, threshold_ranges)
 
 
 # --------------------------------------------------------------------------
@@ -65,6 +65,32 @@ def test_decoy_clean_and_bait():
 def test_missed_is_zero():
     ev = evaluate([], [[5, 6]])
     assert ev["points"] == 0 and result_key(ev, 1) == "missed"
+
+
+def test_a_series_adds_at_most_one_point_to_the_round():
+    labels = [[50, 60]]
+    many = evaluate([[55, 56], [1, 2], [5, 6], [9, 10], [13, 14]], labels, n=1000)   # a hit and 4 false alarms
+    assert many["points"] == -3 and many["round_points"] == -1
+    one = evaluate([[55, 56]], labels, n=1000)
+    assert one["points"] == 1 and one["round_points"] == 1
+    none = evaluate([], labels, n=1000)
+    assert none["round_points"] == 0
+    assert outcome(many, evaluate([[1, 2]], labels, n=1000)) == "nobody"   # -3 vs -1: both negative, a tie
+    assert outcome(one, many) == "you"
+
+
+def test_marking_the_whole_series_is_a_false_alarm():
+    labels = [[500, 520]]
+    whole = evaluate([[0, 999]], labels, n=1000)
+    assert whole["hits"] == 0 and whole["false_alarms"] == 1 and whole["too_wide"] == 1
+    assert whole["points"] == -1
+    assert result_key(whole, 1) == "false alarm"
+    assert "too wide" in result_text(whole, 1)
+    fits = evaluate([[450, 549]], labels, n=1000)        # 100 points: the limit
+    assert fits["hits"] == 1 and fits["too_wide"] == 0
+    wide = evaluate([[450, 550]], labels, n=1000)        # 101 points: over it
+    assert wide["hits"] == 0 and wide["too_wide"] == 1
+    assert evaluate([[0, 999]], [], n=1000)["points"] == -1   # a decoy, smothered
 
 
 # --------------------------------------------------------------------------
@@ -123,9 +149,10 @@ def test_verdicts():
     s = np.zeros(300)
     s[10:20] = 1
     assert score_series([[150, 160]], [[150, 155]], team(s), 300)["verdict"].startswith("YOU FOUND IT")
-    assert score_series([[200, 210]], [[10, 15]], team(s), 300)["verdict"].startswith("THE DETECTORS FOUND IT")
+    assert score_series([[200, 210]], [[10, 15]], team(s), 300)["verdict"].endswith("FOUND IT. YOU DIDN’T.")
     assert score_series([[200, 210]], [[250, 260]], team(s), 300)["verdict"] == "NOBODY FOUND THIS ONE"
-    assert score_series([[12, 14]], [[10, 15]], team(s), 300)["verdict"] == "EVERYONE GOT THIS ONE"
+    assert score_series([[12, 14]], [[10, 15]], team(s, s), 300)["verdict"] == "EVERYONE GOT THIS ONE"   # a team
+    assert score_series([[12, 14]], [[10, 15]], team(s), 300)["verdict"] == "YOU BOTH GOT THIS ONE"      # one opponent
 
 
 def test_average_can_miss_what_one_detector_caught():
@@ -192,13 +219,15 @@ def test_full_round(client):
     assert st["stats"]["plays"] == 0 and st["leaderboard"] == []
 
     r = client.post("/api/round", json={"nick": "ada <b>"}).json()
-    assert r["nick"] == "ADA B" and r["count"] == 6
+    assert r["nick"] == "ADA B" and r["count"] == 10
+    assert r["difficulty"] == "normal" and r["time_limit_s"] == 45
     rid = r["round_id"]
 
     tiers = []
     for i in range(r["count"]):
         s = client.get(f"/api/round/{rid}/{i}").json()
-        assert set(s) == {"idx", "label", "n", "values"}     # nothing that leaks the answer
+        assert set(s) == {"idx", "label", "n", "values", "opponent"}     # nothing that leaks the answer
+        assert set(s["opponent"]) >= {"name", "pool"}
         mid = s["n"] // 2
         rev = client.post(f"/api/round/{rid}/{i}/submit",
                           json={"ranges": [[mid - 20, mid + 20]], "nothing": False,
@@ -209,17 +238,30 @@ def test_full_round(client):
         assert rev["you"]["points"] == rev["you"]["hits"] - rev["you"]["false_alarms"] + rev["you"]["clean"]
         assert client.post(f"/api/round/{rid}/{i}/feedback", json={"answer": "see"}).json()["ok"]
 
-    assert sorted(tiers) == sorted(["easy", "easy", "medium", "medium", "unsolved", "decoy"])
+    assert sorted(tiers) == sorted(["easy"] * 3 + ["medium"] * 3 + ["unsolved"] * 2 + ["decoy"] * 2)
     fin = client.post(f"/api/round/{rid}/finish", json={}).json()
-    assert len(fin["results"]) == 6 and fin["rank"] == 0
+    assert len(fin["results"]) == 10 and fin["rank"] == 0
     assert fin["leaderboard"][0]["name"] == "ADA B"
     assert fin["stats"]["plays"] == 1 and fin["stats"]["det_avg"] == fin["det_total"]
+
+
+def test_difficulty_sets_the_mix_and_the_clock(client):
+    hard = client.post("/api/round", json={"nick": "x", "difficulty": "hard"}).json()
+    assert hard["count"] == 10 and hard["time_limit_s"] == 30 and hard["difficulty"] == "hard"
+    easy = client.post("/api/round", json={"nick": "x", "difficulty": "easy"}).json()
+    assert easy["time_limit_s"] == 60
+    bogus = client.post("/api/round", json={"nick": "x", "difficulty": "impossible"}).json()
+    assert bogus["difficulty"] == "normal"
+    board = client.get("/api/stats").json()
+    assert set(board["difficulties"]) == {"easy", "normal", "hard"}
+    assert len(board["packs"]) == 1 and board["packs"][0]["datasets"] == []   # synthetic pack: no datasets
+    assert client.post("/api/round", json={"nick": "x", "dataset": "YAHOO"}).status_code == 400
 
 
 def test_bad_requests(client):
     rid = client.post("/api/round", json={}).json()["round_id"]
     assert client.get("/api/round/nope/0").status_code == 404
-    assert client.get(f"/api/round/{rid}/9").status_code == 404
+    assert client.get(f"/api/round/{rid}/10").status_code == 404
     assert client.post(f"/api/round/{rid}/0/feedback", json={"answer": "maybe"}).status_code == 400
     assert client.post(f"/api/round/{rid}/0/submit", json={"ranges": "x"}).status_code == 400
 
@@ -307,3 +349,18 @@ def test_build_pack_on_a_tiny_benchmark(tmp_path):
             assert len(s.labels) == 1 and s.labels[0][1] - s.labels[0][0] == 29
             assert s.source["filename"].endswith(".csv")
     assert "unsolved flat x1" in r.stdout and "decoy flat x1" in r.stdout, r.stdout
+
+
+def test_single_opponent_is_named():
+    s = np.zeros(300)
+    s[10:20] = 1
+    solo = [{"name": "KShapeAD", "score": s.tolist()}]
+    r = score_series([[200, 210]], [[10, 15]], solo, 300)
+    assert r["verdict"] == "KSHAPEAD FOUND IT. YOU DIDN’T."
+    assert r["verdict_sub"].endswith("KShapeAD: one hit, no false alarms.")
+    r = score_series([[12, 14]], [[10, 15]], solo, 300)
+    assert r["verdict"] == "YOU BOTH GOT THIS ONE"
+    r = score_series([[200, 210]], [[250, 260]], solo, 300)
+    assert "KShapeAD missed it; it raised one false alarm." in r["verdict_sub"]
+    r = score_series([], [], solo, 300)
+    assert r["verdict_sub"].endswith("You said so. KShapeAD took the bait.")

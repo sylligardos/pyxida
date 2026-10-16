@@ -64,9 +64,9 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
           <div className="cards">
             <article className="panel card">
               <div className="top"><span>01</span><span className="diamond diamond-human-hollow" aria-hidden="true" /></div>
-              <h3>Landscape</h3>
+              <h3>Explore</h3>
               <p>Every series scored by the best detector on it. Which datasets and anomaly types are still open, and which the top five already solve.</p>
-              <Link href={href("/landscape", state)}>Open the landscape →</Link>
+              <Link href={href("/explore", state)}>Open the landscape →</Link>
             </article>
             <article className="panel card">
               <div className="top"><span>02</span><span className="diamond diamond-det" aria-hidden="true" /></div>

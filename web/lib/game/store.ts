@@ -3,7 +3,7 @@
 // locally. The Store interface is what the routes use, so a Postgres store
 // can take its place online.
 
-import { mkdirSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync } from "fs";
 import path from "path";
 import Database from "better-sqlite3";
 import type { SeriesResult } from "./scoring";
@@ -15,8 +15,8 @@ export type Stats = {
 };
 
 export interface Store {
-  newRound(id: string, nick: string, pack: string, series: number[]): void;
-  getRound(id: string): { id: string; nick: string; series: number[] } | null;
+  newRound(id: string, nick: string, pack: string, series: number[], difficulty: string): void;
+  getRound(id: string): { id: string; nick: string; pack: string; series: number[] } | null;
   logPlay(roundId: string, idx: number, seriesId: number, tier: string, nothing: boolean, result: SeriesResult, elapsedMs: number | null, view: Record<string, unknown> | null): void;
   logFeedback(roundId: string, idx: number, seriesId: number, answer: string): void;
   finishRound(roundId: string): { you_total: number; det_total: number; results: string };
@@ -27,7 +27,7 @@ export interface Store {
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rounds (
     id TEXT PRIMARY KEY, nick TEXT NOT NULL, pack TEXT NOT NULL, series TEXT NOT NULL,
-    created REAL NOT NULL, finished REAL, you_total INTEGER, det_total INTEGER, results TEXT);
+    created REAL NOT NULL, finished REAL, you_total INTEGER, det_total INTEGER, results TEXT, difficulty TEXT);
 CREATE TABLE IF NOT EXISTS plays (
     round_id TEXT NOT NULL, idx INTEGER NOT NULL, series_id INTEGER NOT NULL, tier TEXT NOT NULL,
     said_nothing INTEGER NOT NULL, ranges TEXT NOT NULL, det_ranges TEXT NOT NULL, n_labels INTEGER NOT NULL,
@@ -51,17 +51,22 @@ function sinceOf(todayOnly: boolean): number {
 
 export class SqliteStore implements Store {
   db: Database.Database;
+  csvPath: string;
   constructor(file: string) {
     mkdirSync(path.dirname(file), { recursive: true });
+    this.csvPath = path.join(path.dirname(file), "plays.csv");
     this.db = new Database(file);
     this.db.exec(SCHEMA);
+    // Logs from before difficulties existed: add the column.
+    const cols = (this.db.prepare("PRAGMA table_info(rounds)").all() as { name: string }[]).map((c) => c.name);
+    if (!cols.includes("difficulty")) this.db.exec("ALTER TABLE rounds ADD COLUMN difficulty TEXT");
   }
-  newRound(id: string, nick: string, pack: string, series: number[]) {
-    this.db.prepare("INSERT INTO rounds (id, nick, pack, series, created) VALUES (?, ?, ?, ?, ?)").run(id, nick, pack, JSON.stringify(series), now());
+  newRound(id: string, nick: string, pack: string, series: number[], difficulty: string) {
+    this.db.prepare("INSERT INTO rounds (id, nick, pack, series, difficulty, created) VALUES (?, ?, ?, ?, ?, ?)").run(id, nick, pack, JSON.stringify(series), difficulty, now());
   }
   getRound(id: string) {
-    const r = this.db.prepare("SELECT id, nick, series FROM rounds WHERE id = ?").get(id) as { id: string; nick: string; series: string } | undefined;
-    return r ? { id: r.id, nick: r.nick, series: JSON.parse(r.series) as number[] } : null;
+    const r = this.db.prepare("SELECT id, nick, pack, series FROM rounds WHERE id = ?").get(id) as { id: string; nick: string; pack: string; series: string } | undefined;
+    return r ? { id: r.id, nick: r.nick, pack: r.pack, series: JSON.parse(r.series) as number[] } : null;
   }
   logPlay(roundId: string, idx: number, seriesId: number, tier: string, nothing: boolean, result: SeriesResult, elapsedMs: number | null, view: Record<string, unknown> | null) {
     const { you, det } = result;
@@ -75,12 +80,30 @@ export class SqliteStore implements Store {
   logFeedback(roundId: string, idx: number, seriesId: number, answer: string) {
     this.db.prepare("INSERT OR REPLACE INTO feedback VALUES (?, ?, ?, ?, ?)").run(roundId, idx, seriesId, answer, now());
   }
+  // A series adds +1, 0 or -1 to the round: the sign of its points.
   finishRound(roundId: string) {
-    const rows = this.db.prepare("SELECT you_points, det_points, outcome FROM plays WHERE round_id = ? ORDER BY idx").all(roundId) as { you_points: number; det_points: number; outcome: string }[];
-    const you = rows.reduce((s, r) => s + r.you_points, 0), det = rows.reduce((s, r) => s + r.det_points, 0);
-    const results = rows.map((r) => LETTER[r.outcome]).join("");
-    this.db.prepare("UPDATE rounds SET finished = ?, you_total = ?, det_total = ?, results = ? WHERE id = ?").run(now(), you, det, results, roundId);
+    const rows = this.db.prepare("SELECT * FROM plays WHERE round_id = ? ORDER BY idx").all(roundId) as Record<string, number | string | null>[];
+    const you = rows.reduce((s, r) => s + Math.sign(r.you_points as number), 0), det = rows.reduce((s, r) => s + Math.sign(r.det_points as number), 0);
+    const results = rows.map((r) => LETTER[r.outcome as string]).join("");
+    const finished = now();
+    this.db.prepare("UPDATE rounds SET finished = ?, you_total = ?, det_total = ?, results = ? WHERE id = ?").run(finished, you, det, results, roundId);
+    this.appendCsv(roundId, finished, rows);
     return { you_total: you, det_total: det, results };
+  }
+  // Every finished round also goes to plays.csv next to the database: one
+  // line per series, readable without sqlite, kept across restarts.
+  appendCsv(roundId: string, finished: number, rows: Record<string, number | string | null>[]) {
+    const round = this.db.prepare("SELECT nick, pack, difficulty FROM rounds WHERE id = ?").get(roundId) as { nick: string; pack: string; difficulty: string | null } | undefined;
+    if (!round) return;
+    const cols = ["finished", "round_id", "nick", "pack", "difficulty", "idx", "series_id", "tier", "said_nothing", "you_hits", "you_fa", "you_points", "det_hits", "det_fa", "det_points", "outcome", "elapsed_ms"];
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = rows.map((r) => [new Date(finished * 1000).toISOString(), roundId, round.nick, round.pack, round.difficulty ?? "",
+      r.idx, r.series_id, r.tier, r.said_nothing, r.you_hits, r.you_fa, r.you_points, r.det_hits, r.det_fa, r.det_points, r.outcome, r.elapsed_ms].map(q).join(","));
+    const file = this.csvPath;
+    try {
+      if (!existsSync(file)) appendFileSync(file, cols.join(",") + "\n");
+      appendFileSync(file, lines.join("\n") + "\n");
+    } catch (e) { console.error("plays.csv:", e); }
   }
   leaderboard(limit: number, todayOnly: boolean): BoardRow[] {
     return (this.db.prepare("SELECT id, nick, you_total, results FROM rounds WHERE finished IS NOT NULL AND finished >= ? ORDER BY you_total DESC, finished ASC LIMIT ?")

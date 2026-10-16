@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS rounds (
     finished    REAL,
     you_total   INTEGER,
     det_total   INTEGER,
-    results     TEXT                    -- one letter per series: W, T or L
+    results     TEXT,                   -- one letter per series: W, T or L
+    difficulty  TEXT                    -- easy | normal | hard
 );
 CREATE TABLE IF NOT EXISTS plays (
     round_id     TEXT NOT NULL,
@@ -71,17 +72,22 @@ class Store:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.csv_path = self.path.parent / "plays.csv"     # one line per series played, see append_csv
         self.db = sqlite3.connect(self.path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        # Logs from before difficulties existed: add the column.
+        if "difficulty" not in [r[1] for r in self.db.execute("PRAGMA table_info(rounds)")]:
+            self.db.execute("ALTER TABLE rounds ADD COLUMN difficulty TEXT")
+            self.db.commit()
         self.db.commit()
 
     # ---------------------------------------------------------------- writes
 
-    def new_round(self, round_id: str, nick: str, pack: str, series: list[int]):
+    def new_round(self, round_id: str, nick: str, pack: str, series: list[int], difficulty: str = "normal"):
         self.db.execute(
-            "INSERT INTO rounds (id, nick, pack, series, created) VALUES (?, ?, ?, ?, ?)",
-            (round_id, nick, pack, json.dumps(series), time.time()))
+            "INSERT INTO rounds (id, nick, pack, series, difficulty, created) VALUES (?, ?, ?, ?, ?, ?)",
+            (round_id, nick, pack, json.dumps(series), difficulty, time.time()))
         self.db.commit()
 
     def log_play(self, round_id: str, idx: int, series_id: int, tier: str, nothing: bool,
@@ -104,17 +110,40 @@ class Store:
         self.db.commit()
 
     def finish_round(self, round_id: str) -> dict:
-        rows = self.db.execute(
-            "SELECT you_points, det_points, outcome FROM plays WHERE round_id = ? ORDER BY idx",
-            (round_id,)).fetchall()
-        you = sum(r["you_points"] for r in rows)
-        det = sum(r["det_points"] for r in rows)
+        """A series adds +1, 0 or -1 to the round: the sign of its points."""
+        rows = self.db.execute("SELECT * FROM plays WHERE round_id = ? ORDER BY idx", (round_id,)).fetchall()
+        sign = lambda x: (x > 0) - (x < 0)  # noqa: E731
+        you = sum(sign(r["you_points"]) for r in rows)
+        det = sum(sign(r["det_points"]) for r in rows)
         results = "".join(LETTER[r["outcome"]] for r in rows)
+        finished = time.time()
         self.db.execute(
             "UPDATE rounds SET finished = ?, you_total = ?, det_total = ?, results = ? WHERE id = ?",
-            (time.time(), you, det, results, round_id))
+            (finished, you, det, results, round_id))
         self.db.commit()
+        self.append_csv(round_id, finished, rows)
         return {"you_total": you, "det_total": det, "results": results}
+
+    def append_csv(self, round_id: str, finished: float, rows) -> None:
+        """Every finished round also goes to plays.csv next to the database:
+        one line per series, readable without sqlite."""
+        import csv
+        from datetime import datetime, timezone
+        rnd = self.db.execute("SELECT nick, pack, difficulty FROM rounds WHERE id = ?", (round_id,)).fetchone()
+        if rnd is None or self.csv_path is None:
+            return
+        cols = ["finished", "round_id", "nick", "pack", "difficulty", "idx", "series_id", "tier", "said_nothing",
+                "you_hits", "you_fa", "you_points", "det_hits", "det_fa", "det_points", "outcome", "elapsed_ms"]
+        new = not self.csv_path.exists()
+        with self.csv_path.open("a", newline="") as f:
+            w = csv.writer(f)
+            if new:
+                w.writerow(cols)
+            for r in rows:
+                w.writerow([datetime.fromtimestamp(finished, timezone.utc).isoformat(), round_id, rnd["nick"], rnd["pack"],
+                            rnd["difficulty"] or "", r["idx"], r["series_id"], r["tier"], r["said_nothing"],
+                            r["you_hits"], r["you_fa"], r["you_points"], r["det_hits"], r["det_fa"], r["det_points"],
+                            r["outcome"], r["elapsed_ms"]])
 
     # ----------------------------------------------------------------- reads
 

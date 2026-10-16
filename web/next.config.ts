@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
+  async redirects() {
+    // The three views that became Explore. Query strings (b, k) carry over.
+    return ["landscape", "rankings", "redundancy"].map((v) => ({ source: `/${v}`, destination: `/explore?v=${v}`, permanent: false }));
+  },
   async rewrites() {
     return [
       // Needle, served as it is from game/web (public/play is a link to it).

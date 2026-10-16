@@ -22,6 +22,7 @@ data/raw
 data/scores
 data/metrics
 data/runtime
+data/notes.json
 
 # ── Test / cache ──────────────────────────────────────────────────────────────
 .pytest_cache/

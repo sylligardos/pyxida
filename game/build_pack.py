@@ -4,10 +4,12 @@
 @when: 2026 (3rd year PhD)
 @what: Needle -- build the content pack from a benchmark (univariate).
 
-For each picked series: the values, the labels as ranges, and each team
-member's score, min-max normalised over the window. Whether a detector
-caught the anomaly is worked out at play time (scoring.py), from the same
-scores the Reveal draws. Series longer than --max-len are
+For each picked series: the values, the labels as ranges, and the score of
+its opponent, min-max normalised over the window. The opponent is the best
+detector on that series in the benchmark, by VUS-PR from the metric files,
+out of the whole pool (--detectors narrows the pool). One series, one
+opponent: "you go up against the best". Whether it caught the anomaly is
+worked out at play time (scoring.py), from the same score the Reveal draws. Series longer than --max-len are
 cut to a window that holds the first anomaly whole and, by default, no
 other (--max-labels: every screen is designed around one anomaly); decoys
 are label-free windows cut from the normal part of a series. Flat windows
@@ -20,14 +22,10 @@ the metric files: a detector "solves" a series when its VUS-PR reaches
 --solved; easy when at least half of all detectors solve it, unsolved when
 none does, medium in between.
 
-The team: pick_team.py ranks the detectors by Shapley value against the
-oracle; pass the top five with --detectors.
-
 Run:
     python game/make_tiers.py
-    python game/pick_team.py
-    python game/build_pack.py --detectors KShapeAD Sub_LOF MatrixProfile LOF MOMENT_FT \\
-        --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
+    python game/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
+    python game/build_pack.py --benchmark tsb-uad --out data/game/tsb-uad
 """
 
 import argparse
@@ -95,43 +93,71 @@ def usable(values) -> bool:
     return bool(np.isfinite(v).all() and np.ptp(v) > 0)
 
 
-def make_series(sid, tier, values, labels, scores, detectors, a, b, source):
+def make_series(sid, tier, values, labels, score, opponent, a, b, source):
     v, y = values[a:b], labels[a:b]
-    norm = []
-    for s in scores[:, a:b]:
-        lo, hi = s.min(), s.max()
-        norm.append((s - lo) / (hi - lo) if hi > lo else np.zeros_like(s))
+    s = np.asarray(score, dtype=float)[a:b]
+    lo, hi = s.min(), s.max()
+    norm = (s - lo) / (hi - lo) if hi > lo else np.zeros_like(s)
     return Series(
         id=sid, tier=tier, values=round_values(v), labels=labels_to_ranges(y),
-        detectors=[{"name": d, "score": quantize(s.tolist())} for d, s in zip(detectors, norm)],
-        source={**source, "start": int(a), "end": int(b)},
+        detectors=[{"name": opponent["name"], "score": quantize(norm.tolist())}],
+        source={**source, "start": int(a), "end": int(b), "opponent": opponent},
     )
 
 
-def load_batch(parser: TSBADParser, files: list[str], detectors: list[str]) -> dict:
-    """{filename: (values, labels, scores)} for the files that load cleanly."""
+def load_batch(parser: TSBADParser, files: list[str]) -> dict:
+    """{filename: (values, labels)} for the files that load cleanly."""
     if not files:
         return {}
     names, values, labels = parser.load_timeseries(filename=files)
-    data = {n: (v, y) for n, v, y in zip(names, values, labels)}
-    kept, scores, _ = parser.load_scores(detectors=detectors, filenames=files, return_filenames=True)
     out = {}
-    for f, s in zip(kept, scores):
-        if f not in data or data[f][0].ndim != 1:
-            continue
-        v, y = data[f]
-        out[f] = (v, (np.asarray(y) > 0).astype(np.int8), s)
+    for n, v, y in zip(names, values, labels):
+        if np.asarray(v).ndim == 1:
+            out[n] = (v, (np.asarray(y) > 0).astype(np.int8))
     return out
+
+
+def rank_detectors(parser: TSBADParser, pool: list[str]) -> dict[str, list[tuple[str, float]]]:
+    """{filename: [(detector, VUS-PR), ...] best first}, from the metric files."""
+    m = parser.load_metrics(pool)
+    if m.empty:
+        raise SystemExit(f"No metric files under {parser.metrics_path}.")
+    m = m.dropna(subset=["VUS-PR"])
+    out = {}
+    for f, g in m.groupby("File Name"):
+        g = g.sort_values("VUS-PR", ascending=False)
+        out[f] = list(zip(g["Model Name"], g["VUS-PR"].astype(float)))
+    return out
+
+
+def load_score(parser: TSBADParser, detector: str, filename: str):
+    """One detector's score on one file, or None if missing or not finite."""
+    path = parser.scores_path / detector / filename.replace(".csv", ".npy")
+    if not path.exists():
+        return None
+    s = np.load(path)
+    if s.ndim != 1 or not np.isfinite(s).all():
+        return None
+    return s
 
 
 class Picker:
     """Walks shuffled candidates, a batch at a time, until a tier has its
     quota. Counts why a candidate was passed over."""
 
-    def __init__(self, parser, detectors, args, rng, ids):
-        self.parser, self.detectors, self.args, self.rng, self.ids = parser, detectors, args, rng, ids
+    def __init__(self, parser, pool, ranking, args, rng, ids):
+        self.parser, self.pool, self.ranking, self.args, self.rng, self.ids = parser, pool, ranking, args, rng, ids
         self.source = {"benchmark": parser.benchmark}
         self.rejected = {}
+
+    def opponent(self, f):
+        """The best detector on this series that has a usable score, with
+        its VUS-PR and rank in the pool; None when none loads."""
+        for rank, (det, vus) in enumerate(self.ranking.get(f, []), start=1):
+            score = load_score(self.parser, det, f)
+            if score is not None and len(score) == self.length:
+                return score, {"name": det, "vus_pr": round(float(vus), 4), "rank": rank, "pool": len(self.pool)}
+        return None
 
     def reject(self, tier, why):
         self.rejected[(tier, why)] = self.rejected.get((tier, why), 0) + 1
@@ -152,6 +178,10 @@ class Picker:
             start, end = window_around_first(y, a.max_len, self.rng, a.max_labels)
             if end - start < a.min_len:
                 return self.reject(tier, "short")
+            # A window that is mostly anomaly is not a needle in a haystack,
+            # and no mark under the width cap could cover it.
+            if y[start:end].mean() > a.max_anomalous:
+                return self.reject(tier, "too anomalous")
         if not usable(v[start:end]):
             return self.reject(tier, "flat")
         return start, end
@@ -164,19 +194,28 @@ class Picker:
             if len(out) >= quota:
                 break
             batch = candidates[i:i + self.args.batch]
-            loaded = load_batch(self.parser, batch, self.detectors)
+            loaded = load_batch(self.parser, batch)
             for f in batch:
                 if len(out) >= quota:
                     break
                 tried += 1
                 if f not in loaded:
-                    self.reject(tier, "missing scores")
+                    self.reject(tier, "unreadable")
                     continue
-                v, y, s = loaded[f]
+                v, y = loaded[f]
+                if f not in self.ranking:
+                    self.reject(tier, "no metrics")
+                    continue
                 window = self.cut(tier, v, y)
                 if window is None:
                     continue
-                out.append(make_series(self.ids.pop(), tier, v, y, s, self.detectors, *window,
+                self.length = len(v)
+                opp = self.opponent(f)
+                if opp is None:
+                    self.reject(tier, "missing scores")
+                    continue
+                score, who = opp
+                out.append(make_series(self.ids.pop(), tier, v, y, score, who, *window,
                                        {**self.source, "filename": f}))
         print(f"{tier}: {len(out)} of {quota} from {tried} candidates")
         return out
@@ -185,12 +224,14 @@ class Picker:
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--benchmark", default="tsb-ad")
-    ap.add_argument("--detectors", nargs="+", required=True, help="the detector team, in display order")
+    ap.add_argument("--detectors", nargs="+", help="narrow the pool of opponents; default: every detector with scores")
     ap.add_argument("--tiers", type=Path, help="CSV with columns filename,tier (easy|medium|unsolved)")
     ap.add_argument("--solved", type=float, default=0.5, help="VUS-PR that counts as solved, without --tiers")
     ap.add_argument("--per-tier", type=int, default=30, help="series per tier, decoys included")
     ap.add_argument("--min-len", type=int, default=1000)
     ap.add_argument("--max-len", type=int, default=10000)
+    ap.add_argument("--max-anomalous", type=float, default=0.10,
+                    help="pass over windows with more than this share of anomalous points")
     ap.add_argument("--max-labels", type=int, default=1,
                     help="most labeled anomalies in a window (the screens are designed for one); 0 = no limit")
     ap.add_argument("--batch", type=int, default=30, help="candidates loaded per batch")
@@ -200,9 +241,11 @@ def main():
 
     rng = random.Random(args.seed)
     parser = TSBADParser(benchmark=args.benchmark, kind="uni")
-    missing = set(args.detectors) - set(parser.get_detectors())
+    pool = sorted(args.detectors or parser.get_detectors())
+    missing = set(pool) - set(parser.get_detectors())
     if missing:
         raise SystemExit(f"Unknown detectors for {parser.benchmark}: {sorted(missing)}")
+    ranking = rank_detectors(parser, pool)
 
     if args.tiers:
         t = pd.read_csv(args.tiers)
@@ -214,7 +257,7 @@ def main():
 
     total = 4 * args.per_tier
     ids = rng.sample(range(10, 10 + total * 10), total)   # neutral, unrelated to the benchmark ids
-    picker = Picker(parser, args.detectors, args, rng, ids)
+    picker = Picker(parser, pool, ranking, args, rng, ids)
     out = []
     for tier in ["easy", "medium", "unsolved"]:
         out += picker.pick(tier, tiers[tiers == tier].index, args.per_tier)
@@ -222,9 +265,11 @@ def main():
     used = {s.source["filename"] for s in out}
     out += picker.pick("decoy", set(parser.meta.filename) - used, args.per_tier)
 
-    write_pack(args.out, f"{parser.benchmark} uni", args.detectors, out)
+    write_pack(args.out, f"{parser.benchmark} uni", pool, out)
     counts = pd.Series([s.tier for s in out]).value_counts().to_dict()
     print(f"Wrote {len(out)} series to {args.out}: {counts}")
+    opp = pd.Series([s.source["opponent"]["name"] for s in out]).value_counts()
+    print("Opponents:", ", ".join(f"{d} x{n}" for d, n in opp.items()))
     if picker.rejected:
         print("Passed over:", ", ".join(f"{t} {why} x{n}" for (t, why), n in sorted(picker.rejected.items())))
 

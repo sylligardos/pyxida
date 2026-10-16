@@ -87,7 +87,10 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
     .map(([ds, m]) => ({ ds, v: m[a][b]! }))
     .sort((x, y) => y.v - x.v).slice(0, WHERE);
   // The series in the scoped dataset where a pair agrees most.
-  const topSeries = (a: number, b: number) => (data.examples[scope] ?? []).filter((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a)).slice(0, WHERE);
+  const topSeries = (a: number, b: number) => {
+    const ex = data.examples[scope];
+    return (ex?.pairs[`${Math.min(a, b)}-${Math.max(a, b)}`] ?? []).slice(0, WHERE).map(([i, v]) => ({ file: ex.files[i], v }));
+  };
 
   // Stacking the top k.
   const key = `k${k}` as const;
@@ -281,8 +284,9 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
               </div>
               {shown.map((s) => {
                 const pins = Array.from(new Set([...s[key]!.top_dets, ...s[key]!.best_dets])).join(",");
+                const avg = Array.from(new Set([s[key]!.top_dets.join(","), s[key]!.best_dets.join(",")])).join("|");
                 return (
-                  <Link key={s.file} className="rd-brow" href={href("/workbench", state, { s: s.file, pin: pins, top: "0" })}>
+                  <Link key={s.file} className="rd-brow" href={href("/workbench", state, { s: s.file, pin: pins, top: "0", avg })}>
                     <span className="mono" style={{ fontSize: 12, color: "var(--text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.file.replace(/\.csv$/, "")}</span>
                     <span style={{ fontSize: 13, fontWeight: 500 }}>{s.dataset}</span>
                     <span className="mono" style={{ fontSize: 12, color: "var(--text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s[key]!.top_dets.join(" + ")}</span>

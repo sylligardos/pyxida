@@ -2,14 +2,12 @@ import Link from "next/link";
 import { BENCHMARKS, KIND_LABEL, KINDS, State, href, hasKind, YOUR_DATA } from "@/lib/data";
 import { BenchmarkSelect } from "./BenchmarkSelect";
 
+// Three pages. Needle is the bonus: a pill at the right, not a page.
 const PAGES = [
   { path: "/", label: "Intro" },
-  { path: "/landscape", label: "Landscape" },
-  { path: "/rankings", label: "Rankings" },
-  { path: "/redundancy", label: "Redundancy" },
   { path: "/graph", label: "Graph" },
+  { path: "/explore", label: "Explore" },
   { path: "/workbench", label: "Workbench" },
-  { path: "/game", label: "Game" },
 ];
 
 const Chevron = () => (
@@ -55,6 +53,7 @@ export async function TopBar({ state, current }: { state: State; current: string
               </Link>
             ))}
           </div>
+          <Link href={href("/game", state)} className="pill-needle" aria-current={current === "/game" ? "page" : undefined}>Needle</Link>
         </div>
       </div>
     </header>

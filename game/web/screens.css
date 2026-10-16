@@ -36,6 +36,21 @@
 }
 .play-form input::placeholder { color: #4A4478; }
 .play-form .btn-primary { height: 64px; font-size: 26px; width: 100%; }
+.play-form .choice { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.play-form .choice button {
+  flex: 1; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--text-2); cursor: pointer;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.play-form .choice button:last-child { border-right: 0; }
+.play-form .choice button small { font-size: 10px; font-weight: 400; letter-spacing: 0.04em; color: var(--text-4); }
+.play-form .choice button[aria-pressed="true"] { background: var(--player); color: #1C0010; }
+.play-form .choice button[aria-pressed="true"] small { color: #1C0010; }
+.play-form .pick-row { display: flex; gap: 10px; }
+.play-form select {
+  height: 40px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 13px; width: 100%;
+}
 .mini-board { display: flex; flex-direction: column; gap: 4px; }
 .mini-row {
   display: grid; grid-template-columns: 52px minmax(0, 1fr) 48px; align-items: center; gap: 10px;
@@ -113,6 +128,21 @@
 .answer[aria-pressed="true"] { border-color: var(--player); background: rgba(255, 61, 154, 0.12); }
 .answer[aria-pressed="true"] .diamond { color: var(--player); background: var(--player); }
 .else-note { margin: 0; font-size: 13px; color: var(--player-soft); }
+.opp-card {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 14px 16px; border-radius: 10px;
+  border: 1px solid var(--line); background: rgba(34, 211, 238, 0.04);
+}
+.opp-card.on { border-color: rgba(34, 211, 238, 0.5); background: rgba(34, 211, 238, 0.10); }
+.opp-name { font-family: var(--display); font-size: clamp(22px, 2.6vw, 30px); color: var(--det); line-height: 1; }
+.opp-sub { font-size: 13px; color: var(--text-3); }
+.opp-did { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--text-2); }
+.opp-did .diamond { width: 12px; height: 12px; color: var(--dim); background: transparent; }
+.opp-card.on .opp-did { color: var(--det-soft); }
+.opp-card.on .opp-did .diamond { color: var(--det); background: var(--det); }
+.series-name { font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-3); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+a.series-name:hover { color: var(--det-soft); text-decoration: underline; }
+.back-link { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); text-decoration: none; }
+.back-link:hover { color: var(--text); }
 .next-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .next-row span { font-size: 13px; color: var(--text-3); }
 .next-row .btn-primary { height: 52px; padding: 0 34px; font-size: 20px; }
@@ -136,7 +166,7 @@
 .vs span { font-family: var(--mono); font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 4px; background: #2C2754; }
 .tiers-line { margin: 0; text-align: center; font-size: 18px; color: var(--text-2); }
 .tiers-line b { font-family: var(--mono); }
-.cards { width: 100%; max-width: 1376px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; }
+.cards { width: 100%; max-width: 1376px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .card { border-radius: 12px; border: 2px solid var(--frame); background: var(--panel); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--glow); }
 .card.nobody { opacity: 0.85; }
 .banner { display: flex; align-items: center; justify-content: center; gap: 10px; height: 30px; font-family: var(--display); font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; }

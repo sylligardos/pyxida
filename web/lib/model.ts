@@ -66,7 +66,8 @@ export type Redundancy = {
   buffer: number;
   detectors: string[]; mean_vus: (number | null)[];
   agree: { global: (number | null)[][]; datasets: Record<string, (number | null)[][]>; n: Record<string, number> };
-  examples: Record<string, { file: string; a: number; b: number; v: number }[]>;
+  // Per dataset: its files, and per pair "a-b" (a < b) the best series as [file index, tau].
+  examples: Record<string, { files: string[]; pairs: Record<string, [number, number][]> }>;
   series: { file: string; dataset: string; best1: number; best1_det: string; k2?: KSet; k3?: KSet; agree: { top5: number; all: number } | null }[];
 };
 

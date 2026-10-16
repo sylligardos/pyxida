@@ -16,6 +16,10 @@ export type Detector = { name: string; score: ArrayLike<number> };
 
 export const THRESHOLD_STD = 3;
 export const DETECTOR_RULE: "average" | "pooled" = "average";
+// A range wider than this share of the window is too wide: a false alarm
+// whatever it covers. Marking the whole series is not finding the anomaly.
+export const MAX_RANGE_FRACTION = 0.10;
+export const maxRangeLen = (n: number) => Math.max(1, Math.floor(n * MAX_RANGE_FRACTION));
 
 // numpy's .round(d): scale, round half to even, unscale.
 export function roundHalfEven(x: number, digits = 0): number {
@@ -133,14 +137,20 @@ export function detectorFlags(detectors: Detector[], labels: Range[], n: number,
 
 // ------------------------------------------------- one side, one series
 
-export type Evaluation = { hits: number; false_alarms: number; missed: number; clean: number; points: number; label_hits: boolean[] };
+// round_points: what the series adds to the round, the sign of points. A
+// detector with fifty false alarms loses the series, not the round.
+export type Evaluation = { hits: number; false_alarms: number; missed: number; clean: number; points: number; round_points: number; label_hits: boolean[]; too_wide: number };
 
-export function evaluate(ranges: Range[], labels: Range[]): Evaluation {
-  const label_hits = labels.map((l) => ranges.some((r) => overlaps(r, l)));
-  const false_alarms = ranges.filter((r) => !labels.some((l) => overlaps(r, l))).length;
+export function evaluate(ranges: Range[], labels: Range[], n: number | null = null): Evaluation {
+  const limit = n ? maxRangeLen(n) : null;
+  const wide = ranges.filter((r) => limit !== null && r[1] - r[0] + 1 > limit);
+  const fair = ranges.filter((r) => !wide.includes(r));
+  const label_hits = labels.map((l) => fair.some((r) => overlaps(r, l)));
+  const false_alarms = fair.filter((r) => !labels.some((l) => overlaps(r, l))).length + wide.length;
   const hits = label_hits.filter(Boolean).length;
   const clean = !labels.length && !ranges.length ? 1 : 0;
-  return { hits, false_alarms, missed: labels.length - hits, clean, points: hits - false_alarms + clean, label_hits };
+  const points = hits - false_alarms + clean;
+  return { hits, false_alarms, missed: labels.length - hits, clean, points, round_points: Math.sign(points), label_hits, too_wide: wide.length };
 }
 
 export type ResultKey = "found" | "partial" | "clean" | "missed" | "false alarm";
@@ -162,15 +172,18 @@ export function resultText(ev: Evaluation, nLabels: number): string {
     "false alarm": ev.false_alarms === 1 ? "False alarm" : `${ev.false_alarms} false alarms`,
   }[key];
   if ((key === "found" || key === "partial") && ev.false_alarms) text += ` · ${ev.false_alarms} false alarm${ev.false_alarms > 1 ? "s" : ""}`;
+  if (ev.too_wide) text += ` · ${ev.too_wide} too wide`;
   return text;
 }
 
 export type Outcome = "you" | "det" | "both" | "nobody";
 
+// By what the series adds to the round, so two negative scores tie.
 export function outcome(you: Evaluation, det: Evaluation): Outcome {
-  if (you.points > det.points) return "you";
-  if (det.points > you.points) return "det";
-  return you.points > 0 ? "both" : "nobody";
+  const a = you.round_points, b = det.round_points;
+  if (a > b) return "you";
+  if (b > a) return "det";
+  return a > 0 ? "both" : "nobody";
 }
 
 // ----------------------------------------------------------------- words
@@ -179,29 +192,35 @@ const count = (k: number, word: string) => (k === 0 ? `no ${word}s` : k === 1 ? 
 const names = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
-export function verdict(you: Evaluation, det: Evaluation, nLabels: number, caught: string[], teamSize: number, rule = DETECTOR_RULE): [string, string] {
+// With `opponent` (the single detector the player faces) the words name it;
+// without, they say "the detectors" and `caught` names the team members.
+export function verdict(you: Evaluation, det: Evaluation, nLabels: number, caught: string[], teamSize: number, rule = DETECTOR_RULE, opponent: string | null = null): [string, string] {
+  const name = opponent ?? "The detectors";
+  const they = opponent ? "it" : "they";
   if (nLabels === 0) {
     const youClean = !!you.clean, detClean = det.false_alarms === 0;
     const tail = youClean && detClean ? "Nobody took the bait."
-      : youClean ? "You said so. The detectors took the bait."
-        : detClean ? "The detectors left it alone. You took the bait."
+      : youClean ? `You said so. ${name} took the bait.`
+        : detClean ? `${name} left it alone. You took the bait.`
           : "Everyone took the bait.";
     return ["NOTHING TO FIND", `This window had no anomaly. ${tail}`];
   }
   const youHit = you.hits > 0, detHit = det.hits > 0;
-  const head = youHit && !detHit ? "YOU FOUND IT. THE DETECTORS DIDN’T."
-    : detHit && !youHit ? "THE DETECTORS FOUND IT. YOU DIDN’T."
-      : youHit && detHit ? "EVERYONE GOT THIS ONE" : "NOBODY FOUND THIS ONE";
+  const head = youHit && !detHit ? `YOU FOUND IT. ${name.toUpperCase()} DIDN’T.`
+    : detHit && !youHit ? `${name.toUpperCase()} FOUND IT. YOU DIDN’T.`
+      : youHit && detHit ? (opponent ? "YOU BOTH GOT THIS ONE" : "EVERYONE GOT THIS ONE") : "NOBODY FOUND THIS ONE";
 
   let youPart = `${capitalize(`${count(you.hits, "hit")}, ${count(you.false_alarms, "false alarm")}`)}.`;
   const who = caught.length <= 2 ? names(caught) : `${caught.length} of ${teamSize} detectors`;
-  const fa = det.false_alarms ? `; they raised ${count(det.false_alarms, "false alarm")}` : "";
+  const fa = det.false_alarms ? `; ${they} raised ${count(det.false_alarms, "false alarm")}` : "";
   let detPart: string;
   if (detHit) {
-    detPart = `The detectors: ${count(det.hits, "hit")}, ${count(det.false_alarms, "false alarm")}.`;
-    if (rule === "pooled") detPart = `${who} caught it. ${detPart}`;
-  } else if (caught.length) {
-    detPart = `The detectors missed it${fa}, though ${who} alone crossed ${caught.length === 1 ? "its" : "their"} line.`;
+    detPart = `${name}: ${count(det.hits, "hit")}, ${count(det.false_alarms, "false alarm")}.`;
+    if (rule === "pooled" && !opponent) detPart = `${who} caught it. ${detPart}`;
+  } else if (caught.length && !opponent) {
+    detPart = `${name} missed it${fa}, though ${who} alone crossed ${caught.length === 1 ? "its" : "their"} line.`;
+  } else if (opponent) {
+    detPart = det.false_alarms ? `${name} missed it${fa}.` : `${name} never crossed its line.`;
   } else {
     detPart = `Not one detector flagged it${fa}.`;
   }
@@ -220,10 +239,12 @@ export type SeriesResult = {
 export function scoreSeries(rawRanges: ArrayLike<ArrayLike<number>>, labels: Range[], detectors: Detector[], n: number): SeriesResult {
   const ranges = cleanRanges(rawRanges, n);
   const [each, side] = detectorFlags(detectors, labels, n);
-  const you = evaluate(ranges, labels);
-  const det = evaluate(side.flags, labels);
+  const you = evaluate(ranges, labels, n);
+  const det = evaluate(side.flags, labels, n);
   const caught = each.filter((d) => d.caught).map((d) => d.name);
-  const [head, sub] = verdict(you, det, labels.length, caught, each.length);
+  // One detector in the pack means a single named opponent.
+  const opponent = each.length === 1 ? each[0].name : null;
+  const [head, sub] = verdict(you, det, labels.length, caught, each.length, DETECTOR_RULE, opponent);
   return {
     ranges, det_ranges: side.flags, detectors: each,
     team_score: side.score, team_threshold: side.threshold,

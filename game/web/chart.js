@@ -18,6 +18,7 @@ const COLORS = {
 const MIN_SPAN = 30;          // the deepest zoom, in points
 const CLICK_PX = 4;           // a drag shorter than this is a click
 const CLICK_HALF_PX = 3;      // a click marks +-3 px around the point
+export const MAX_RANGE_FRACTION = 0.10;   // scoring.py: a range wider than this share of the window is a false alarm
 
 const fmtInt = (x) => Math.round(x).toLocaleString('en-US');
 
@@ -108,7 +109,7 @@ export class SeriesChart {
     this.o = Object.assign({
       mode: 'thumb', height: 380, values: [], stroke: COLORS.line, panel: null,
       labels: [], ranges: [], detRanges: [], detectors: null, team: null, maxRanges: 5,
-      truthLabel: true, lineWidth: null, onChange: null, onView: null, onLimit: null,
+      truthLabel: true, lineWidth: null, onChange: null, onView: null, onLimit: null, onWide: null,
     }, opts);
     this.n = this.o.values.length;
     this.view = [-0.5, this.n - 0.5];
@@ -234,6 +235,7 @@ export class SeriesChart {
   }
 
   pxToIdx(px) { return px / this.plot.clientWidth * (this.view[1] - this.view[0]); }
+  maxLen() { return Math.max(1, Math.floor(this.n * MAX_RANGE_FRACTION)); }
 
   bindEdit() {
     const plot = this.plot;
@@ -250,19 +252,21 @@ export class SeriesChart {
       e.preventDefault();
       plot.setPointerCapture(e.pointerId);
       const at = this.xToIdx(e.clientX);
-      this.drag = { act, k, x0: e.clientX, at0: at, orig: k >= 0 ? this.ranges[k].slice() : null, cur: null };
+      this.drag = { act, k, x0: e.clientX, at0: at, orig: k >= 0 ? this.ranges[k].slice() : null, cur: null,
+        before: this.ranges.map((r) => r.slice()) };
     });
     plot.addEventListener('pointermove', (e) => {
       const d = this.drag;
       if (!d) return;
       const at = this.xToIdx(e.clientX);
       const n = this.n;
+      const span = this.maxLen() - 1;   // a range may be at most maxLen points long
       if (d.act === 'new') {
-        d.cur = [Math.min(d.at0, at), Math.max(d.at0, at)];
+        d.cur = [Math.max(Math.min(d.at0, at), d.at0 - span), Math.min(Math.max(d.at0, at), d.at0 + span)];
       } else if (d.act === 'l') {
-        this.ranges[d.k] = [Math.min(Math.round(at), d.orig[1]), d.orig[1]];
+        this.ranges[d.k] = [Math.max(Math.min(Math.round(at), d.orig[1]), d.orig[1] - span), d.orig[1]];
       } else if (d.act === 'r') {
-        this.ranges[d.k] = [d.orig[0], Math.max(Math.round(at), d.orig[0])];
+        this.ranges[d.k] = [d.orig[0], Math.min(Math.max(Math.round(at), d.orig[0]), d.orig[0] + span)];
       } else if (d.act === 'move') {
         const len = d.orig[1] - d.orig[0];
         let a = Math.round(d.orig[0] + at - d.at0);
@@ -284,6 +288,12 @@ export class SeriesChart {
         }
       }
       this.ranges = cleanRanges(this.ranges, this.n);
+      // Two marks that touch merge into one; if that one is too wide, the
+      // edit is undone rather than scored as a false alarm.
+      if (this.ranges.some((r) => r[1] - r[0] + 1 > this.maxLen())) {
+        this.ranges = d.before;
+        if (this.o.onWide) this.o.onWide();
+      }
       this.renderBands();
       if (this.o.onChange) this.o.onChange(this.ranges);
     };

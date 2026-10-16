@@ -9,12 +9,15 @@ import Link from "next/link";
 import type { Landscape, SeriesDoc, State, Summary } from "@/lib/model";
 import { DATA_URL, href, stem } from "@/lib/model";
 import { LaneChart, type Lane } from "./LaneChart";
+import { ONE_LINERS, averagePrecision } from "@/lib/oneliners";
 import { useSessionState } from "@/lib/session";
 
 type Metric = "aucpr" | "vus";
 const MAX_TOP = 6;
 const DEFAULT_TOP = 3;
 const DEFAULT_CHANNELS = 3;
+const DEFAULT_K = 20;
+const MAX_K = 200;
 const SAMPLE_MAX_POINTS = 300_000;
 const PINS_KEY = "pyxida.pins";
 const NOTES_KEY = "pyxida.notes";
@@ -27,12 +30,15 @@ function readLocal<T>(key: string, fallback: T): T {
 function writeLocal(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window, full, or blocked */ }
 }
+function putNotes(notes: Notes) {
+  return fetch("/api/notes", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(notes) }).catch(() => {});
+}
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-export function WorkbenchView({ summary, landscape, state, initial, explicit, pin, top, metric: metricParam }: {
+export function WorkbenchView({ summary, landscape, state, initial, explicit, pin, top, avg, metric: metricParam }: {
   summary: Summary; landscape: Landscape | null; state: State; initial: string; explicit: boolean;
-  pin: string | null; top: string | null; metric: Metric | null;
+  pin: string | null; top: string | null; avg: string | null; metric: Metric | null;
 }) {
   // The series, metric and top-N survive navigation within the tab. A link
   // that names a series (?s=, ?sample=1, ?hardest=1) is a request for that
@@ -43,6 +49,8 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
   const [metric, setMetric] = useSessionState<Metric>("workbench.metric", metricParam ?? "vus", () => !metricParam);
   const [topN, setTopN] = useSessionState("workbench.topN", DEFAULT_TOP);
   const [pins, setPins] = useState<string[]>([]);
+  // Stacks to draw as one lane each, their scores averaged (?avg=A,B|C,D).
+  const [avgs, setAvgs] = useState<string[][]>([]);
   const [highlight, setHighlight] = useState<number | null>(null);
   const [channels, setChannels] = useState<number[]>([0, 1, 2]);
   const [doc, setDoc] = useState<SeriesDoc | null>(null);
@@ -50,6 +58,11 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
   const [scores, setScores] = useState<Record<string, Uint16Array | null>>({});
   const [notes, setNotes] = useState<Notes>({});
   const [draft, setDraft] = useState("");
+  // "I'm feeling lucky": Keogh's one-liners run in the browser on this
+  // series, k is their window. While on, the metric is AUC-PR for all.
+  const [lucky, setLucky] = useState(false);
+  const [k, setK] = useState(DEFAULT_K);
+  const metricBefore = useRef<Metric>("vus");
   const cache = useRef(new Map<string, Promise<Uint16Array | null>>());
   const loaded = useRef(false);     // pins are written back only after they were read
 
@@ -89,15 +102,23 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
       setPins(pin.split(",").filter((d) => summary.detectors.includes(d)));
       if (top !== null) setTopN(Math.max(0, Math.min(MAX_TOP, Number(top) || 0)));
     } else setPins(readLocal(PINS_KEY, []));
-    setNotes(readLocal(NOTES_KEY, {}));
+    setAvgs((avg ?? "").split("|").map((g) => g.split(",").filter((d) => summary.detectors.includes(d))).filter((g) => g.length > 1));
+    fetch("/api/notes").then((r) => (r.ok ? r.json() : {})).then((server: Notes) => {
+      const local = readLocal<Notes>(NOTES_KEY, {});
+      const merged = { ...local, ...server };
+      setNotes(merged);
+      if (Object.keys(local).length) {   // old browser notes: push them to the file, then forget them
+        putNotes(merged).then(() => { try { localStorage.removeItem(NOTES_KEY); } catch { /* blocked */ } });
+      }
+    }).catch(() => setNotes(readLocal(NOTES_KEY, {})));
     loaded.current = true;
-  }, [summary, pin, top]);
+  }, [summary, pin, top, avg]);
   useEffect(() => { if (loaded.current) writeLocal(PINS_KEY, pins); }, [pins]);
 
   // The URL follows the series, so a link to the Workbench is a link to a series.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    q.set("s", file); q.delete("sample"); q.delete("hardest"); q.delete("pin"); q.delete("top"); q.delete("m");
+    q.set("s", file); q.delete("sample"); q.delete("hardest"); q.delete("pin"); q.delete("top"); q.delete("avg"); q.delete("m");
     window.history.replaceState(null, "", `${window.location.pathname}?${q}`);
   }, [file]);
 
@@ -127,12 +148,26 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
 
   useEffect(() => {
     let live = true;
-    const want = shown.map(([d]) => d);
+    const want = Array.from(new Set([...shown.map(([d]) => d), ...avgs.flat()]));
     Promise.all(want.map((d) => loadScore(d).then((s) => [d, s] as const))).then((pairs) => {
       if (live) setScores(Object.fromEntries(pairs));
     });
     return () => { live = false; };
-  }, [shown, loadScore]);
+  }, [shown, avgs, loadScore]);
+
+  // Each stack's lane: the mean of its detectors' scaled scores, as the
+  // Redundancy page stacks them, with its AUC-PR on this series.
+  const avgLanes = useMemo<Lane[]>(() => {
+    if (!doc) return [];
+    return avgs.flatMap((g) => {
+      const ss = g.map((d) => scores[d]);
+      if (ss.some((s) => !s || s.length !== doc.n)) return [];
+      const values = new Float32Array(doc.n);
+      for (const s of ss) for (let i = 0; i < doc.n; i++) values[i] += s![i] / ss.length;
+      const ap = averagePrecision(values, doc.labels);
+      return [{ id: `avg:${g.join("+")}`, kind: "score" as const, title: `avg ${g.join(" + ")}`, lines: g, sub: `${isNaN(ap) ? "no labels" : `AUC ${ap.toFixed(2)}`} · avg`, values }];
+    });
+  }, [avgs, scores, doc]);
 
   useEffect(() => { setDraft(notes[`${state.benchmark}:${state.kind}:${file}`]?.note ?? ""); }, [notes, file, state]);
 
@@ -141,6 +176,19 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
     const pick = (pool.length ? pool : summary.series)[Math.floor(Math.random() * (pool.length || summary.series.length))];
     if (pick) setFile(pick.file);
   };
+
+  const toggleLucky = () => {
+    if (lucky) { setLucky(false); setMetric(metricBefore.current); }
+    else { metricBefore.current = metric; setMetric("aucpr"); setLucky(true); }
+  };
+  const series = doc ? (doc.values ?? doc.channels?.[channels[0] ?? 0]?.values ?? null) : null;
+  const luckyLanes = useMemo<Lane[]>(() => {
+    if (!lucky || !doc || !series) return [];
+    return ONE_LINERS.map((o) => ({ o, values: o.run(series, k) }))
+      .map(({ o, values }) => ({ o, values, ap: averagePrecision(values, doc.labels) }))
+      .sort((a, b) => (isNaN(b.ap) ? -1 : b.ap) - (isNaN(a.ap) ? -1 : a.ap))
+      .map(({ o, values, ap }, i) => ({ id: `lucky:${o.id}`, kind: "lucky" as const, title: `#${i + 1} ${o.title}`, sub: `${isNaN(ap) ? "no labels" : `AUC ${ap.toFixed(2)}`} · one-liner`, values }));
+  }, [lucky, doc, series, k]);
 
   const pointsAnomalous = doc ? doc.labels.reduce((s, [a, b]) => s + (b - a + 1), 0) : 0;
   const n = doc?.n ?? row?.n ?? 0;
@@ -160,17 +208,25 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
       const rank = rankOf.get(d), v = valueOf.get(d);
       lanes.push({ id: d, kind: "score", title: `${rank ? `#${rank} ` : ""}${d}`, sub: `${v !== undefined ? `${metric === "vus" ? "VUS" : "AUC"} ${v.toFixed(2)}` : "unranked"}${pinned ? " · pinned" : ""}`, pinned, values: s });
     }
+    lanes.push(...avgLanes, ...luckyLanes);
   }
 
   // Fetched but absent or of the wrong length: not drawn, and said so.
   const missing = doc ? shown.map(([d]) => d).filter((d) => d in scores && (!scores[d] || scores[d]!.length !== doc.n)) : [];
   const noteKey = `${state.benchmark}:${state.kind}:${file}`;
+  const noted = useMemo(() => Object.entries(notes).sort((a, b) => b[1].updated.localeCompare(a[1].updated)), [notes]);
   const saveNote = () => {
     const next = { ...notes };
     if (draft.trim()) next[noteKey] = { note: draft.trim(), updated: new Date().toISOString().slice(0, 16).replace("T", " ") };
     else delete next[noteKey];
-    setNotes(next); writeLocal(NOTES_KEY, next);
+    setNotes(next); putNotes(next);
   };
+  const deleteNote = (k: string) => {
+    const next = { ...notes }; delete next[k];
+    setNotes(next); putNotes(next);
+    if (k === noteKey) setDraft("");
+  };
+  const editNote = (f: string) => { setFile(f); setTimeout(() => document.getElementById("wb-note")?.focus(), 50); };
   const exportNotes = () => {
     const rows = [["series", "note", "updated"], ...Object.entries(notes).map(([k, v]) => [k, v.note, v.updated])];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -206,7 +262,7 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
             <span className="lbl" id="wb-metric">Rank detectors by</span>
             <div className="seg tall" role="group" aria-labelledby="wb-metric" style={{ display: "flex" }}>
               <button type="button" aria-pressed={metric === "aucpr"} onClick={() => setMetric("aucpr")} style={{ flex: 1, justifyContent: "center" }}>AUC-PR</button>
-              <button type="button" aria-pressed={metric === "vus"} onClick={() => setMetric("vus")} style={{ flex: 1, justifyContent: "center" }}>VUS-PR</button>
+              <button type="button" aria-pressed={metric === "vus"} disabled={lucky} title={lucky ? "One-liners are scored by AUC-PR only" : undefined} onClick={() => setMetric("vus")} style={{ flex: 1, justifyContent: "center" }}>VUS-PR</button>
             </div>
           </div>
           <div className="ctl">
@@ -223,6 +279,12 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
                   <button type="button" aria-label={`Unpin ${d}`} onClick={() => setPins(pins.filter((p) => p !== d))}>×</button>
                 </span>
               ))}
+              {avgs.map((g, i) => (
+                <span key={g.join("+")} className="chip">
+                  avg {g.join(" + ")}
+                  <button type="button" aria-label={`Remove the average of ${g.join(" and ")}`} onClick={() => setAvgs(avgs.filter((_, j) => j !== i))}>×</button>
+                </span>
+              ))}
               <div className="select chip-select">
                 <select aria-label="Pin a detector" value="" onChange={(e) => { if (e.target.value && !pins.includes(e.target.value)) setPins([...pins, e.target.value]); }}>
                   <option value="">+ pin a detector</option>
@@ -232,6 +294,18 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
                 </select><Chev />
               </div>
             </div>
+          </div>
+          <div className="ctl">
+            <button type="button" className={`btn ${lucky ? "btn-primary" : "btn-outline"}`} aria-pressed={lucky} onClick={toggleLucky} style={{ height: 44, fontSize: 15, background: lucky ? "#FB923C" : undefined, borderColor: "#FB923C", color: lucky ? "#1C1500" : "#FB923C" }}>
+              I&apos;m feeling lucky
+            </button>
+            {lucky ? (
+              <>
+                <label className="lbl" htmlFor="wb-k" style={{ marginTop: 8 }}>Window k <span style={{ color: "#FB923C" }}>{k}</span></label>
+                <input id="wb-k" type="range" min={2} max={MAX_K} step={1} value={k} onChange={(e) => setK(Number(e.target.value))} style={{ accentColor: "#FB923C", height: 40, margin: 0, width: "100%" }} />
+                <span className="muted" style={{ fontSize: 12 }}>Keogh&apos;s one-liners, run live on this series and scored by AUC-PR.</span>
+              </>
+            ) : <span className="muted" style={{ fontSize: 12 }}>Run eight one-line detectors on this series.</span>}
           </div>
         </div>
       </aside>
@@ -297,11 +371,29 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
           <textarea id="wb-note" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="e.g. MatrixProfile fires 12 points before the anomaly, not on it." />
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
             <div style={{ display: "flex", gap: 10 }}>
-              <button type="button" className="btn btn-outline" style={{ height: 44, padding: "0 20px", fontSize: 15 }} onClick={saveNote}>Save note</button>
+              <button type="button" className="btn btn-outline" style={{ height: 44, padding: "0 20px", fontSize: 15 }} onClick={saveNote}>{notes[noteKey] ? "Update note" : "Save note"}</button>
+              {notes[noteKey] && <button type="button" className="btn-sm" onClick={() => deleteNote(noteKey)}>Delete note</button>}
               {Object.keys(notes).length > 0 && <button type="button" className="btn-sm" onClick={exportNotes}>Export as CSV</button>}
             </div>
             {notes[noteKey] && <span className="muted" style={{ fontSize: 13 }}>Saved {notes[noteKey].updated}</span>}
           </div>
+          {noted.length > 0 && (
+            <div className="note-list">
+              {noted.map(([k, v]) => {
+                const [b, kind, f] = k.split(":");
+                const here = k === noteKey, mine = b === state.benchmark && kind === state.kind;
+                return (
+                  <div key={k} className="note-row" aria-current={here ? "true" : undefined}>
+                    {mine
+                      ? <button type="button" className="mono note-open" onClick={() => editNote(f)}>{stem(f)}</button>
+                      : <span className="mono note-open" style={{ color: "var(--text-3)" }}>{b} {kind} · {stem(f)}</span>}
+                    <span style={{ fontSize: 14, color: "var(--text-2)" }}>{v.note}</span>
+                    <span className="mono muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>{v.updated}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <p className="muted" style={{ fontSize: 13 }}>
           <Link href={href("/game", state)}>Try this one yourself →</Link>

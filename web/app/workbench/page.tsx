@@ -37,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       <main style={{ paddingTop: 32 }}>
         {summary && initial ? (
           <WorkbenchView key={`${state.benchmark}/${state.kind}`} summary={summary} landscape={landscape} state={state} initial={initial} explicit={explicit}
-            pin={typeof params.pin === "string" ? params.pin : null} top={typeof params.top === "string" ? params.top : null}
+            pin={typeof params.pin === "string" ? params.pin : null} top={typeof params.top === "string" ? params.top : null} avg={typeof params.avg === "string" ? params.avg : null}
             metric={params.m === "aucpr" || params.m === "vus" ? params.m : null} />
         ) : (
           <section className="wrap" style={{ paddingBottom: 72 }}>

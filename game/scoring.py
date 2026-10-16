@@ -12,6 +12,12 @@ references/GAME_BRIEF.md:
                   same anomaly are one hit, not five.
     false alarm   a range that overlaps no labeled anomaly (-1).
     clean decoy   a series with no anomaly, left unmarked (+1).
+    round points  what a series adds to the round: +1 when the points above
+                  are positive, -1 when negative, 0 otherwise. A detector
+                  with fifty false alarms loses the series, not the round.
+    too wide      a range longer than MAX_RANGE_FRACTION of the window is a
+                  false alarm whatever it covers: marking the whole series
+                  is not finding the anomaly.
 
 The detectors play by the same rules but decide on their own, whatever the
 player marked. A score flags every point more than THRESHOLD_STD standard
@@ -80,6 +86,12 @@ def labels_to_ranges(labels) -> list[list[int]]:
 
 THRESHOLD_STD = 3
 DETECTOR_RULE = "average"      # average | pooled, see the top of the file
+MAX_RANGE_FRACTION = 0.10      # a range wider than this share of the window is too wide
+
+
+def max_range_len(n: int) -> int:
+    """The longest range that still counts, in points."""
+    return max(1, int(n * MAX_RANGE_FRACTION))
 
 
 def threshold(score, k: float = THRESHOLD_STD) -> float:
@@ -148,9 +160,14 @@ def detector_flags(detectors, labels, n: int, rule: str = DETECTOR_RULE) -> tupl
 # One side's result on one series
 # --------------------------------------------------------------------------
 
-def evaluate(ranges, labels) -> dict:
-    hit_mask = [any(overlaps(r, l) for r in ranges) for l in labels]
-    false_alarms = sum(not any(overlaps(r, l) for l in labels) for r in ranges)
+def evaluate(ranges, labels, n: int | None = None) -> dict:
+    """`n` is the window length; with it, ranges wider than max_range_len(n)
+    are too wide: no hit, one false alarm each."""
+    limit = max_range_len(n) if n else None
+    wide = [r for r in ranges if limit is not None and r[1] - r[0] + 1 > limit]
+    fair = [r for r in ranges if r not in wide]
+    hit_mask = [any(overlaps(r, l) for r in fair) for l in labels]
+    false_alarms = sum(not any(overlaps(r, l) for l in labels) for r in fair) + len(wide)
     hits = sum(hit_mask)
     clean = int(not labels and not ranges)
     return {
@@ -159,7 +176,9 @@ def evaluate(ranges, labels) -> dict:
         "missed": len(labels) - hits,
         "clean": clean,
         "points": hits - false_alarms + clean,
+        "round_points": int(np.sign(hits - false_alarms + clean)),
         "label_hits": hit_mask,
+        "too_wide": len(wide),
     }
 
 
@@ -186,16 +205,20 @@ def result_text(ev: dict, n_labels: int) -> str:
     }[key]
     if key in ("found", "partial") and ev["false_alarms"]:
         text += f" · {ev['false_alarms']} false alarm" + ("s" if ev["false_alarms"] > 1 else "")
+    if ev.get("too_wide"):
+        text += f" · {ev['too_wide']} too wide"
     return text
 
 
 def outcome(you: dict, det: dict) -> str:
-    """you | det | both | nobody -- the banner on the summary card."""
-    if you["points"] > det["points"]:
+    """you | det | both | nobody -- the banner on the summary card, by what
+    the series adds to the round (so two negative scores tie)."""
+    a, b = you["round_points"], det["round_points"]
+    if a > b:
         return "you"
-    if det["points"] > you["points"]:
+    if b > a:
         return "det"
-    return "both" if you["points"] > 0 else "nobody"
+    return "both" if a > 0 else "nobody"
 
 
 # --------------------------------------------------------------------------
@@ -217,43 +240,48 @@ def _names(names: list[str]) -> str:
 
 
 def verdict(you: dict, det: dict, n_labels: int, caught: list[str], team_size: int,
-            rule: str = DETECTOR_RULE) -> tuple[str, str]:
-    """Headline and sub-line for the Reveal screen. `caught` names the
-    detectors whose own flags touch an anomaly. Under the average rule the
-    team can miss what one of them caught alone; the sub-line says so rather
-    than contradict the lit lanes."""
+            rule: str = DETECTOR_RULE, opponent: str | None = None) -> tuple[str, str]:
+    """Headline and sub-line for the Reveal screen. With `opponent` (the
+    single detector the player faces) the words name it; without, they say
+    "the detectors" and `caught` names the team members whose own flags
+    touch an anomaly (the average can miss what one caught alone; the
+    sub-line says so rather than contradict the lit lanes)."""
+    name = opponent or "The detectors"
+    they = "it" if opponent else "they"
     if n_labels == 0:
         you_clean, det_clean = bool(you["clean"]), det["false_alarms"] == 0
         if you_clean and det_clean:
             tail = "Nobody took the bait."
         elif you_clean:
-            tail = "You said so. The detectors took the bait."
+            tail = f"You said so. {name} took the bait."
         elif det_clean:
-            tail = "The detectors left it alone. You took the bait."
+            tail = f"{name} left it alone. You took the bait."
         else:
             tail = "Everyone took the bait."
         return "NOTHING TO FIND", f"This window had no anomaly. {tail}"
 
     you_hit, det_hit = you["hits"] > 0, det["hits"] > 0
     if you_hit and not det_hit:
-        head = "YOU FOUND IT. THE DETECTORS DIDN’T."
+        head = f"YOU FOUND IT. {name.upper()} DIDN’T."
     elif det_hit and not you_hit:
-        head = "THE DETECTORS FOUND IT. YOU DIDN’T."
+        head = f"{name.upper()} FOUND IT. YOU DIDN’T."
     elif you_hit and det_hit:
-        head = "EVERYONE GOT THIS ONE"
+        head = "YOU BOTH GOT THIS ONE" if opponent else "EVERYONE GOT THIS ONE"
     else:
         head = "NOBODY FOUND THIS ONE"
 
     you_part = (f"{_count(you['hits'], 'hit')}, {_count(you['false_alarms'], 'false alarm')}"
                 .capitalize() + ".")
     who = _names(caught) if len(caught) <= 2 else f"{len(caught)} of {team_size} detectors"
-    fa = f"; they raised {_count(det['false_alarms'], 'false alarm')}" if det["false_alarms"] else ""
+    fa = f"; {they} raised {_count(det['false_alarms'], 'false alarm')}" if det["false_alarms"] else ""
     if det_hit:
-        det_part = f"The detectors: {_count(det['hits'], 'hit')}, {_count(det['false_alarms'], 'false alarm')}."
-        if rule == "pooled":
+        det_part = f"{name}: {_count(det['hits'], 'hit')}, {_count(det['false_alarms'], 'false alarm')}."
+        if rule == "pooled" and not opponent:
             det_part = f"{who} caught it. " + det_part
-    elif caught:
-        det_part = f"The detectors missed it{fa}, though {who} alone crossed {'its' if len(caught) == 1 else 'their'} line."
+    elif caught and not opponent:
+        det_part = f"{name} missed it{fa}, though {who} alone crossed {'its' if len(caught) == 1 else 'their'} line."
+    elif opponent:
+        det_part = f"{name} never crossed its line." if not det["false_alarms"] else f"{name} missed it{fa}."
     else:
         det_part = f"Not one detector flagged it{fa}."
     if n_labels > 1:
@@ -267,10 +295,12 @@ def score_series(ranges, labels, detectors, n: int) -> dict:
     ranges = clean_ranges(ranges, n)
     each, side = detector_flags(detectors, labels, n)
     det_flags = side["flags"]
-    you = evaluate(ranges, labels)
-    det = evaluate(det_flags, labels)
+    you = evaluate(ranges, labels, n)
+    det = evaluate(det_flags, labels, n)
     caught = [d["name"] for d in each if d["caught"]]
-    head, sub = verdict(you, det, len(labels), caught, len(each))
+    # One detector in the pack means a single named opponent.
+    opponent = each[0]["name"] if len(each) == 1 else None
+    head, sub = verdict(you, det, len(labels), caught, len(each), opponent=opponent)
     return {
         "ranges": ranges,
         "det_ranges": det_flags,

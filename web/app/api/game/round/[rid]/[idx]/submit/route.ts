@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { body, ctx, getRound, getSeries, handle, HttpError, idxParam } from "@/lib/game/api";
-import { TIER_NOTE } from "@/lib/game/pack";
+import { opponentOf, TIER_NOTE } from "@/lib/game/pack";
 import { DETECTOR_RULE, scoreSeries } from "@/lib/game/scoring";
 
 export const POST = handle(async (req: Request, { params }: { params: Promise<{ rid: string; idx: string }> }) => {
-  const { pack, store } = await ctx();
+  const { packs, store } = await ctx();
   const p = await params;
   const idx = idxParam(p.idx);
-  const round = getRound(p.rid);
-  const s = getSeries(pack, round, idx);
+  const round = getRound(packs, p.rid);
+  const s = await getSeries(round, idx);
   const data = await body(req);
   const nothing = !!data.nothing;
   let ranges: [number, number][] = [];
@@ -26,11 +26,16 @@ export const POST = handle(async (req: Request, { params }: { params: Promise<{ 
   const view = data.view && typeof data.view === "object" && !Array.isArray(data.view) ? (data.view as Record<string, unknown>) : {};
   store.logPlay(round.id, idx, s.id, s.tier, nothing, result, elapsed, { ...view, det_rule: DETECTOR_RULE });
 
-  const pick = (e: typeof result.you) => ({ hits: e.hits, false_alarms: e.false_alarms, missed: e.missed, clean: e.clean, points: e.points });
+  const pick = (e: typeof result.you) => ({ hits: e.hits, false_alarms: e.false_alarms, missed: e.missed, clean: e.clean, points: e.points, round_points: e.round_points, too_wide: e.too_wide });
+  // Where the window came from, for the link into the Workbench. Only
+  // after the reveal: the benchmark file name gives the anomaly away.
+  const src = s.source ?? {};
+  const source = { benchmark: src.benchmark ?? null, filename: src.filename ?? null, start: src.start ?? null, end: src.end ?? null };
   const team = result.detectors.map((d, i) => ({ ...d, score: s.detectors[i].score }));
   return NextResponse.json({
     idx, label: `SERIES ${s.id}`, n,
     tier: s.tier, tier_note: TIER_NOTE[s.tier],
+    opponent: opponentOf(s), source,
     labels: s.labels,
     team_score: result.team_score, team_threshold: result.team_threshold,
     ranges: result.ranges, det_ranges: result.det_ranges,

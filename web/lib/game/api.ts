@@ -2,7 +2,7 @@
 // lookups and the board payload.
 
 import { NextResponse } from "next/server";
-import { loadPack, type Pack, type PackSeries, ROUND_MIX } from "./pack";
+import { datasets, DIFFICULTIES, loadPacks, type Pack, type PackSeries, readSeries, ROUND_MIX } from "./pack";
 import { getStore } from "./store";
 
 export class HttpError extends Error {
@@ -12,18 +12,26 @@ export class HttpError extends Error {
 export const TODAY_ONLY = process.env.PYXIDA_ALL_TIME !== "1";
 
 export async function ctx() {
-  return { pack: await loadPack(), store: getStore() };
+  return { packs: await loadPacks(), store: getStore() };
 }
 
-export function getRound(id: string) {
+// The pack a request names, else the first one.
+export function packFor(packs: Map<string, Pack>, id: unknown): Pack {
+  if (typeof id === "string" && packs.has(id)) return packs.get(id)!;
+  return packs.values().next().value!;
+}
+
+export function getRound(packs: Map<string, Pack>, id: string) {
   const r = getStore().getRound(id);
   if (!r) throw new HttpError(404, "No such round");
-  return r;
+  const pack = packs.get(r.pack);
+  if (!pack) throw new HttpError(404, `The pack of this round (${r.pack}) is not loaded`);
+  return { ...r, pack };
 }
 
-export function getSeries(pack: Pack, round: { series: number[] }, idx: number): PackSeries {
+export function getSeries(round: { pack: Pack; series: number[] }, idx: number): Promise<PackSeries> {
   if (!(idx >= 0 && idx < round.series.length)) throw new HttpError(404, "No such series in this round");
-  return pack.series.get(round.series[idx])!;
+  return readSeries(round.pack, round.series[idx]);
 }
 
 export async function body(req: Request): Promise<Record<string, unknown>> {
@@ -38,13 +46,16 @@ export function cleanNick(nick: unknown): string {
   return s || "ANON";
 }
 
-export function boardPayload(pack: Pack) {
+export function boardPayload(packs: Map<string, Pack>) {
   const store = getStore();
+  const first = packs.values().next().value!;
   return {
     stats: store.stats(TODAY_ONLY),
     leaderboard: store.leaderboard(8, TODAY_ONLY),
-    team_size: pack.detectors.length,
+    team_size: first.detectors.length,
     round_size: ROUND_MIX.length,
+    packs: Array.from(packs.values(), (p) => ({ id: p.id, name: p.name, team: p.detectors, datasets: datasets(p) })),
+    difficulties: Object.fromEntries(Object.entries(DIFFICULTIES).map(([k, v]) => [k, { count: v.mix.length, time_s: v.time_s }])),
   };
 }
 

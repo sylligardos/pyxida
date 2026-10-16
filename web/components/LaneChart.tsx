@@ -11,8 +11,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Lane = {
   id: string;
-  kind: "series" | "score";
+  kind: "series" | "score" | "lucky";   // lucky: a one-liner computed in the browser
   title: string;
+  lines?: string[];   // drawn stacked and smaller in place of the title (an averaged stack's detectors)
   sub?: string;
   pinned?: boolean;
   values: ArrayLike<number>;
@@ -22,7 +23,7 @@ const LABEL_W = 132;
 const SERIES_H = 200;
 const SCORE_H = 78;
 const AXIS_H = 26;
-const COLORS = { line: "#C9C3E6", score: "#22D3EE", grid: "#1F1B45", sep: "#2C2754", label: "#FFE14D", text: "#A9A2D4" };
+const COLORS = { line: "#C9C3E6", score: "#22D3EE", lucky: "#FB923C", grid: "#1F1B45", sep: "#2C2754", label: "#FFE14D", text: "#A9A2D4" };
 
 type View = [number, number];
 
@@ -103,7 +104,7 @@ export function LaneChart({ n, lanes, labels, highlight }: {
       ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
       const rows = lane.kind === "series" ? 4 : 2;
       for (let r = 1; r < rows; r++) { const y = (h * r) / rows; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
-      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? COLORS.line : COLORS.score, lane.kind === "series" ? 10 : 6);
+      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? COLORS.line : lane.kind === "lucky" ? COLORS.lucky : COLORS.score, lane.kind === "series" ? 10 : 6);
     }
   }, [lanes, view, width]);
 
@@ -151,13 +152,19 @@ export function LaneChart({ n, lanes, labels, highlight }: {
         return (
           <div key={lane.id} className="lane" style={{ display: "flex", height: h, borderBottom: `1px solid ${COLORS.sep}` }}>
             <div className="lane-label" style={{ width: LABEL_W, flex: "none", paddingTop: lane.kind === "series" ? 14 : 10, paddingRight: 10, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {lane.pinned && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFE14D" strokeWidth="2.4" strokeLinecap="round" aria-label="pinned"><path d="M12 17v5M8 3h8l-1 7 3 3H6l3-3z" /></svg>
-                )}
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{lane.title}</span>
-              </div>
-              {lane.sub && <div className="mono" style={{ fontSize: 11, color: lane.kind === "series" ? COLORS.label : "var(--det-soft)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lane.sub}</div>}
+              {lane.lines ? (
+                <div title={lane.title} style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.25, color: "var(--text)" }}>
+                  {lane.lines.map((l, i) => <div key={i} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i ? `+ ${l}` : l}</div>)}
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {lane.pinned && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFE14D" strokeWidth="2.4" strokeLinecap="round" aria-label="pinned"><path d="M12 17v5M8 3h8l-1 7 3 3H6l3-3z" /></svg>
+                  )}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{lane.title}</span>
+                </div>
+              )}
+              {lane.sub && <div className="mono" style={{ fontSize: 11, color: lane.kind === "series" ? COLORS.label : lane.kind === "lucky" ? COLORS.lucky : "var(--det-soft)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lane.sub}</div>}
             </div>
             <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }}
               ref={k === 0 ? plotRef : undefined}
@@ -167,13 +174,16 @@ export function LaneChart({ n, lanes, labels, highlight }: {
               {width > 0 && labels.map(([a, b], i) => {
                 const x0 = Math.max(0, xOf(a - 0.5)), x1 = Math.min(width, xOf(b + 0.5));
                 if (x1 < 0 || x0 > width) return null;
-                const w = Math.max(2, x1 - x0);
+                const w = Math.max(3, x1 - x0);
                 const dim = highlight !== null && highlight !== i;
                 const strong = lane.kind === "series";
+                // The labeled anomaly: a yellow band with solid edges, strongest on the series lane.
+                const edge = `1px solid rgba(255,225,77,${dim ? 0.25 : strong ? 0.9 : 0.55})`;
                 return (
                   <div key={i} style={{
-                    position: "absolute", top: 0, bottom: 0, left: x0, width: w, pointerEvents: "none",
-                    background: strong ? `rgba(255,61,154,${dim ? 0.08 : 0.28})` : `rgba(255,61,154,${dim ? 0.04 : 0.14})`,
+                    position: "absolute", top: 0, bottom: 0, left: x0, width: w, pointerEvents: "none", boxSizing: "border-box",
+                    background: strong ? `rgba(255,225,77,${dim ? 0.08 : 0.3})` : `rgba(255,225,77,${dim ? 0.04 : 0.16})`,
+                    borderLeft: edge, borderRight: edge,
                   }} />
                 );
               })}
