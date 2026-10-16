@@ -34,7 +34,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.parser import TSBADParser  # noqa: E402
 
-sys.path.insert(0, str(REPO_ROOT / "game"))
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "needle"))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from build_summary import EXCLUDED as TSB_AD_EXCLUDED  # noqa: E402
 from pack import round_values as sig  # noqa: E402
