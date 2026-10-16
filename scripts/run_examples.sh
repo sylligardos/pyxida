@@ -16,6 +16,6 @@ $RUN --benchmark mtsbench --kind multi \
   --datasets SMD Daphnet MSL SMAP CalIt2 Genesis room-occupancy metro GECCO PSM --detectors $MULTI
 
 for b in timeeval tab mtsbench; do
-  conda run -n ffvus python scripts/compute_metrics.py --benchmark $b
+  conda run -n tsbad python scripts/compute_metrics.py --benchmark $b
 done
 echo "=== examples done"
