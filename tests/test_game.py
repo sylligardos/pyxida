@@ -1,6 +1,6 @@
-"""Needle: scoring rules, the dev pack, and the server API end to end.
+"""Needle: scoring rules, the dev pack, and the pack builder.
 
-Runs without the benchmark: the server is tested on the synthetic dev pack.
+Runs without the benchmark: on the synthetic dev pack and a fake benchmark.
 """
 
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-GAME = Path(__file__).resolve().parents[1] / "game"
+GAME = Path(__file__).resolve().parents[1] / "scripts" / "needle"
 sys.path.insert(0, str(GAME))
 
 from scoring import (clean_ranges, detector_caught, evaluate, labels_to_ranges,  # noqa: E402
@@ -181,23 +181,8 @@ def test_pooled_rule_counts_every_detector():
 
 
 # --------------------------------------------------------------------------
-# Dev pack and server
+# Dev pack
 # --------------------------------------------------------------------------
-
-@pytest.fixture(scope="module")
-def client(tmp_path_factory):
-    pytest.importorskip("starlette")
-    pytest.importorskip("httpx")
-    from starlette.testclient import TestClient
-
-    import make_dev_pack
-    from pack import write_pack
-    from server import create_app
-
-    root = tmp_path_factory.mktemp("needle")
-    write_pack(root / "pack", "test", make_dev_pack.DETECTORS, make_dev_pack.build())
-    return TestClient(create_app(root / "pack", root / "plays.sqlite", seed=0))
-
 
 def test_dev_pack_tiers_behave():
     import make_dev_pack
@@ -212,58 +197,6 @@ def test_dev_pack_tiers_behave():
         if s.tier in ("unsolved", "decoy"):
             assert caught == 0, (s.id, caught)
         assert bool(s.labels) == (s.tier != "decoy")
-
-
-def test_full_round(client):
-    st = client.get("/api/stats").json()
-    assert st["stats"]["plays"] == 0 and st["leaderboard"] == []
-
-    r = client.post("/api/round", json={"nick": "ada <b>"}).json()
-    assert r["nick"] == "ADA B" and r["count"] == 10
-    assert r["difficulty"] == "normal" and r["time_limit_s"] == 45
-    rid = r["round_id"]
-
-    tiers = []
-    for i in range(r["count"]):
-        s = client.get(f"/api/round/{rid}/{i}").json()
-        assert set(s) == {"idx", "label", "n", "values", "opponent"}     # nothing that leaks the answer
-        assert set(s["opponent"]) >= {"name", "pool"}
-        mid = s["n"] // 2
-        rev = client.post(f"/api/round/{rid}/{i}/submit",
-                          json={"ranges": [[mid - 20, mid + 20]], "nothing": False,
-                                "elapsed_ms": 1234, "view": {"zooms": 2}}).json()
-        tiers.append(rev["tier"])
-        assert all(len(d["score"]) == s["n"] for d in rev["detectors"])
-        assert len(rev["team_score"]) == s["n"]
-        assert rev["you"]["points"] == rev["you"]["hits"] - rev["you"]["false_alarms"] + rev["you"]["clean"]
-        assert client.post(f"/api/round/{rid}/{i}/feedback", json={"answer": "see"}).json()["ok"]
-
-    assert sorted(tiers) == sorted(["easy"] * 3 + ["medium"] * 3 + ["unsolved"] * 2 + ["decoy"] * 2)
-    fin = client.post(f"/api/round/{rid}/finish", json={}).json()
-    assert len(fin["results"]) == 10 and fin["rank"] == 0
-    assert fin["leaderboard"][0]["name"] == "ADA B"
-    assert fin["stats"]["plays"] == 1 and fin["stats"]["det_avg"] == fin["det_total"]
-
-
-def test_difficulty_sets_the_mix_and_the_clock(client):
-    hard = client.post("/api/round", json={"nick": "x", "difficulty": "hard"}).json()
-    assert hard["count"] == 10 and hard["time_limit_s"] == 30 and hard["difficulty"] == "hard"
-    easy = client.post("/api/round", json={"nick": "x", "difficulty": "easy"}).json()
-    assert easy["time_limit_s"] == 60
-    bogus = client.post("/api/round", json={"nick": "x", "difficulty": "impossible"}).json()
-    assert bogus["difficulty"] == "normal"
-    board = client.get("/api/stats").json()
-    assert set(board["difficulties"]) == {"easy", "normal", "hard"}
-    assert len(board["packs"]) == 1 and board["packs"][0]["datasets"] == []   # synthetic pack: no datasets
-    assert client.post("/api/round", json={"nick": "x", "dataset": "YAHOO"}).status_code == 400
-
-
-def test_bad_requests(client):
-    rid = client.post("/api/round", json={}).json()["round_id"]
-    assert client.get("/api/round/nope/0").status_code == 404
-    assert client.get(f"/api/round/{rid}/10").status_code == 404
-    assert client.post(f"/api/round/{rid}/0/feedback", json={"answer": "maybe"}).status_code == 400
-    assert client.post(f"/api/round/{rid}/0/submit", json={"ranges": "x"}).status_code == 400
 
 
 def test_window_holds_only_the_first_anomaly():

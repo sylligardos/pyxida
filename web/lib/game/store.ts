@@ -1,7 +1,6 @@
-// Needle: the play log and the leaderboard. Same three tables as
-// game/store.py (rounds, plays, feedback), in SQLite while the demo runs
-// locally. The Store interface is what the routes use, so a Postgres store
-// can take its place online.
+// Needle: the play log and the leaderboard. Three tables (rounds, plays,
+// feedback), in SQLite while the demo runs locally. The Store interface is
+// what the routes use, so a Postgres store can take its place online.
 
 import { appendFileSync, existsSync, mkdirSync } from "fs";
 import path from "path";

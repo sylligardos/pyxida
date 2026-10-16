@@ -1,4 +1,4 @@
-// The TypeScript scoring must give what game/scoring.py gives. The golden
+// The TypeScript scoring must give what scripts/needle/scoring.py gives. The golden
 // file comes from scripts/scoring_golden.py on the synthetic dev pack.
 
 import { describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import { scoreSeries, type SeriesResult } from "../lib/game/scoring";
 const REPO = path.join(__dirname, "..", "..");
 const GOLDEN = path.join(__dirname, "scoring_golden.json");
 const PACK = path.join(REPO, "data", "game", "dev");
-// Both are generated: python game/make_dev_pack.py && python scripts/scoring_golden.py
+// Both are generated: python scripts/needle/make_dev_pack.py && python scripts/scoring_golden.py
 const ready = existsSync(GOLDEN) && existsSync(path.join(PACK, "manifest.json"));
 const golden = ready ? (JSON.parse(readFileSync(GOLDEN, "utf8")) as { id: number; case: string; ranges: number[][]; solo?: boolean; result: SeriesResult }[]) : [];
 const series = new Map<number, { values: number[]; labels: [number, number][]; detectors: { name: string; score: number[] }[] }>(

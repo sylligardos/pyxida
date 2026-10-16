@@ -15,8 +15,8 @@ Runs on TSB-AD out of the box, and on any benchmark in the same format.
 ```
 pyxida/
 ├── web/        the demo (Next.js): Graph, Explore, Workbench, and Needle at /play
-├── game/       Needle: its screens (game/web), scoring rules, pack builders
-├── scripts/    the data pipeline: run detectors, metrics, export for the web
+├── scripts/    the data pipeline: run detectors, metrics, export for the web;
+│               needle/ builds the game's packs
 ├── app/        parser.py (reads a benchmark) and convert/ (other benchmarks into the format)
 ├── data/       the data (see below)
 └── tests/
@@ -56,15 +56,15 @@ To rebuild what the app reads, from the repo root:
 ```bash
 python scripts/export_web.py --benchmark tsb-ad --kind uni --all   # data/web/
 python scripts/export_graph.py --benchmark tsb-ad --kind uni       # the Graph page
-python game/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
+python scripts/needle/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
 ```
 
-Details: `web/README.md`, `game/README.md`, and each script's header.
+Details: `web/README.md`, `scripts/needle/README.md`, and each script's header.
 
 ## Test
 
 ```bash
-pytest tests                 # parser and Needle (game/server.py is the Python reference for the rules)
+pytest tests                 # parser and Needle's rules and pack builder
 cd web && npm test           # the TypeScript scoring against the Python one
 ```
 

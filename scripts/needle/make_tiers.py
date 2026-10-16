@@ -20,8 +20,8 @@ are the single detectors. The extra columns in the CSV are for reading, not
 for the game.
 
 Run:
-    python game/make_tiers.py                       # data/divergence/tiers_uni.csv
-    python game/make_tiers.py --solved 0.7 --buffer 64 --out /tmp/tiers.csv
+    python scripts/needle/make_tiers.py                       # data/divergence/tiers_uni.csv
+    python scripts/needle/make_tiers.py --solved 0.7 --buffer 64 --out /tmp/tiers.csv
 """
 
 import argparse
@@ -29,7 +29,7 @@ from pathlib import Path
 
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DIVERGENCE = REPO_ROOT / "data" / "divergence"
 
 

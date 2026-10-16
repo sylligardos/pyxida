@@ -20,8 +20,8 @@ Reads the k = 1 rows of data/divergence/combos_uni_<dataset>.parquet, like
 make_tiers.py.
 
 Run:
-    python game/pick_team.py                # table, and the top five by Shapley
-    python game/pick_team.py --size 5 --by loo
+    python scripts/needle/pick_team.py                # table, and the top five by Shapley
+    python scripts/needle/pick_team.py --size 5 --by loo
 """
 
 import argparse
@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DIVERGENCE = REPO_ROOT / "data" / "divergence"
 
 

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      // Needle, served as it is from game/web (public/play is a link to it).
+      // Needle's screens, served as they are from public/play.
       { source: "/play", destination: "/play/index.html" },
       { source: "/static/:path*", destination: "/play/:path*" },
       { source: "/api/stats", destination: "/api/game/stats" },

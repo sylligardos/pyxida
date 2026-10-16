@@ -1,4 +1,4 @@
-// Needle: the scoring rules, ported from game/scoring.py. That file stays
+// Needle: the scoring rules, ported from scripts/needle/scoring.py. That file stays
 // the reference; tests/scoring.test.ts checks this port against its output.
 //
 // A range is a pair [a, b] of inclusive point indices.

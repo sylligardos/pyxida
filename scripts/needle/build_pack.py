@@ -23,9 +23,9 @@ the metric files: a detector "solves" a series when its VUS-PR reaches
 none does, medium in between.
 
 Run:
-    python game/make_tiers.py
-    python game/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
-    python game/build_pack.py --benchmark tsb-uad --out data/game/tsb-uad
+    python scripts/needle/make_tiers.py
+    python scripts/needle/build_pack.py --tiers data/divergence/tiers_uni.csv --out data/game/tsb-ad
+    python scripts/needle/build_pack.py --benchmark tsb-uad --out data/game/tsb-uad
 """
 
 import argparse
@@ -37,13 +37,13 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # repo root
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))   # repo root
 
 from pack import Series, quantize, round_values, write_pack  # noqa: E402
 from scoring import labels_to_ranges  # noqa: E402
 from app.parser import TSBADParser  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def tiers_from_metrics(parser: TSBADParser, solved: float) -> pd.Series:

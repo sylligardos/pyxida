@@ -33,7 +33,7 @@ npm run dev          # http://localhost:3000
 
 Needle plays at `/play` (the booth monitor opens `/play?screen=board`). It
 reads every pack under `data/game/` except `dev` (`PYXIDA_PACKS=a,b` to pick
-some, `PYXIDA_PACK` for one); see `game/README.md` for how a pack is built.
+some, `PYXIDA_PACK` for one); see `scripts/needle/README.md` for how a pack is built.
 Plays are logged to `data/game/plays.sqlite` (`PYXIDA_GAME_DB`) and appended
 to `data/game/plays.csv`. `PYXIDA_ALL_TIME=1` makes the board cover every
 day, not just today.
@@ -46,7 +46,7 @@ web/
 │   ├── page.tsx                 Intro
 │   ├── graph/, explore/, workbench/, game/
 │   ├── api/data/[...path]       serves data/web/ to the browser
-│   ├── api/game/                Needle's API (same rules as game/server.py)
+│   ├── api/game/                Needle's API
 │   ├── api/notes                the Workbench notes (data/notes.json)
 │   └── api/help                 the "?" text, for the Needle screens
 ├── components/                  top bar, footer, the views, the lane chart
@@ -55,8 +55,8 @@ web/
 │   ├── data.ts                  reads data/web/ (server only)
 │   ├── help.ts                  the "?" popups
 │   ├── oneliners.ts             Wu & Keogh's one-liners, as scores
-│   └── game/                    scoring.ts (port of game/scoring.py), pack.ts, store.ts (SQLite)
-├── public/play -> ../../game/web   Needle's screens, served as they are
+│   └── game/                    scoring.ts (port of scripts/needle/scoring.py), pack.ts, store.ts (SQLite)
+├── public/play/                  Needle's screens (plain JS), served as they are
 └── tests/                       the scoring port against Python, the one-liners
 ```
 
@@ -65,13 +65,13 @@ the URL: `?b=tsb-ad&k=uni`. A link to the Workbench names its series with `s=`.
 The old `/landscape`, `/rankings` and `/redundancy` redirect to Explore.
 
 `next.config.ts` rewrites `/static/*` and `/api/stats`, `/api/round/*` to
-what Needle's `app.js` expects, so `game/web/` is unchanged.
+what Needle's `app.js` expects.
 
 ## Test
 
 ```bash
-python game/make_dev_pack.py           # from the repo root, once
-python scripts/scoring_golden.py       # what game/scoring.py says, as JSON
+python scripts/needle/make_dev_pack.py   # from the repo root, once
+python scripts/scoring_golden.py         # what scripts/needle/scoring.py says, as JSON
 cd web && npm test                     # the TypeScript port must say the same
 ```
 

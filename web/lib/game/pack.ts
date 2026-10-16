@@ -1,4 +1,4 @@
-// Needle: the content packs, read from disk (game/pack.py writes them). One
+// Needle: the content packs, read from disk (scripts/needle/pack.py writes them). One
 // pack per benchmark, under data/game/<pack>/; the manifest is read once,
 // a series when a round needs it (a pack holds hundreds of 10k-point
 // series). Later the same series live in a database table; only this file
@@ -94,7 +94,7 @@ export function byTier(pack: Pack, dataset: string | null = null): Record<string
 }
 
 // A round is ten series in random order; the difficulty sets the mix of
-// tiers and the seconds per series (game/server.py has the same table).
+// tiers and the seconds per series.
 export const DIFFICULTIES = {
   easy: { mix: ["easy", "easy", "easy", "easy", "easy", "easy", "medium", "medium", "decoy", "decoy"] as Tier[], time_s: 60 },
   normal: { mix: ["easy", "easy", "easy", "medium", "medium", "medium", "unsolved", "unsolved", "decoy", "decoy"] as Tier[], time_s: 45 },

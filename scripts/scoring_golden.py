@@ -2,10 +2,10 @@
 @who: Emmanouil Sylligardos (Sylli)
 @where: Paris
 @when: 2026 (3rd year PhD)
-@what: Golden results of game/scoring.py on the dev pack, for the TypeScript
+@what: Golden results of scripts/needle/scoring.py on the dev pack, for the TypeScript
 port in web/lib/game/scoring.ts (checked by web/tests/scoring.test.ts).
 
-Run, from the repo root, after `python game/make_dev_pack.py`:
+Run, from the repo root, after `python scripts/needle/make_dev_pack.py`:
     python scripts/scoring_golden.py
 """
 
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO / "game"))
+sys.path.insert(0, str(REPO / "scripts" / "needle"))
 
 from pack import load_pack  # noqa: E402
 from scoring import score_series  # noqa: E402
