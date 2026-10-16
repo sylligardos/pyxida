@@ -42,7 +42,9 @@ export function loadPacks(): Promise<Map<string, Pack>> {
 async function packDirs(): Promise<string[]> {
   if (process.env.PYXIDA_PACKS) return process.env.PYXIDA_PACKS.split(",").map((s) => s.trim()).filter(Boolean);
   if (process.env.PYXIDA_PACK) return [process.env.PYXIDA_PACK];
-  const names = (await fs.readdir(PACKS_ROOT, { withFileTypes: true })).filter((d) => d.isDirectory() && d.name !== "dev").map((d) => d.name).sort();
+  // TSB-AD first: the first pack is the default when a round names none.
+  const names = (await fs.readdir(PACKS_ROOT, { withFileTypes: true })).filter((d) => d.isDirectory() && d.name !== "dev").map((d) => d.name)
+    .sort((x, y) => (x === "tsb-ad" ? -1 : y === "tsb-ad" ? 1 : x.localeCompare(y)));
   const dirs: string[] = [];
   for (const n of names) { try { await fs.access(path.join(PACKS_ROOT, n, "manifest.json")); dirs.push(path.join(PACKS_ROOT, n)); } catch { /* not a pack */ } }
   return dirs;
