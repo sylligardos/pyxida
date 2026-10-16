@@ -15,7 +15,7 @@ one-liners), and **Needle** (`/game`, played at `/play`). Every page has a
 From the repo root, once per benchmark:
 
 ```bash
-conda activate tsbad
+conda activate pyxida
 python scripts/export_web.py --benchmark tsb-ad --kind uni --all      # data/web/tsb-ad/uni
 python scripts/export_graph.py --benchmark tsb-ad --kind uni          # adds graph.json
 ```

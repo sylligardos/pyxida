@@ -19,11 +19,11 @@ You need `git` and [Node.js](https://nodejs.org) 20.9 or newer (we use 22).
    git clone https://github.com/sylligardos/pyxida.git
    cd pyxida
    ```
-2. Get the data (about 9 GB, the exported series and scores, not the raw
-   benchmarks): download `pyxida-data.zip` from **ZENODO_LINK** and unzip it
-   in the repo root, so it fills `data/`:
+2. Get the data: download `pyxida-data.zip` from **ZENODO_LINK** (3 GB,
+   about 10 GB unpacked: the exported series and scores, not the raw
+   benchmarks) and unzip it from the repo root, so it fills `data/`:
    ```bash
-   unzip pyxida-data.zip
+   unzip /path/to/pyxida-data.zip
    ```
 3. Run it:
    ```bash
@@ -32,6 +32,7 @@ You need `git` and [Node.js](https://nodejs.org) 20.9 or newer (we use 22).
    npm run dev
    ```
 4. Open http://localhost:3000. Needle is at http://localhost:3000/play.
+   (If port 3000 is taken: `PORT=3001 npm run dev`.)
 
 ## Your own benchmark
 
@@ -46,14 +47,14 @@ conda activate pyxida
    `$TSAD_BENCHMARKS` (default `~/Documents/tsad-benchmarks`):
    ```
    <name>/
-   ├── raw/{uni,multi}/<file>.csv                 the values, then a binary Label column
+   ├── raw/{uni,multi}/<file>.csv                 a header row, the value column(s), then Label (0/1)
    ├── scores/{uni,multi}/<Detector>/<file>.npy   one anomaly score per timestamp
    └── metrics/{uni,multi}/<Detector>.csv         optional, step 2 writes it
    ```
    A file is named `<num>_<Dataset>_id_<k>_<Domain>_tr_<train>_1st_<first>.csv`:
    its number, its dataset, its index in that dataset, a domain tag, the
    length of the train prefix (`tr_0` if none) and the index of the first
-   anomaly, with no `_` inside a field. Converters for TSB-UAD, TAB, TimeEval
+   anomaly (`1st_0` if none), with no `_` inside a field. Converters for TSB-UAD, TAB, TimeEval
    and mTSBench are in `app/convert/`.
 2. **Metrics** (AUC-PR and VUS-PR, if you have none):
    ```bash
@@ -65,15 +66,19 @@ conda activate pyxida
    python scripts/export_graph.py --benchmark <name> --kind uni
    ```
    Use `--kind multi` for multivariate series.
-4. **Needle** (optional, univariate):
+4. **Needle** (optional, univariate series only):
    ```bash
    python scripts/needle/build_pack.py --benchmark <name> --per-tier 100 --out data/game/<name>
    ```
+   A round plays 10 series, and decoys come from series left over, so a
+   pack needs a few dozen series. For a small benchmark, lower `--per-tier`
+   and `--min-len` (default 1000 points).
 5. Run the demo as above and pick `<name>` in the top bar.
 
 Every view works on a new benchmark. Only Redundancy's top-k against the
 best set needs the exhaustive combination search, which exists for TSB-AD
-univariate.
+univariate. Needle starts on TSB-AD; the new pack is offered on its Start
+screen.
 
 ## Layout
 
@@ -91,9 +96,12 @@ More in `web/README.md`, `scripts/needle/README.md`, and each script's header.
 ## Test
 
 ```bash
-pytest tests        # parser, VUS-PR, Needle's rules and pack builder
-cd web && npm test  # Needle's scoring in TypeScript against the Python one
+pytest tests        # VUS-PR, Needle's rules and pack builder; the parser tests need TSB-AD in $TSAD_BENCHMARKS
+cd web && npm test  # the web tests
 ```
+
+`npm test` also checks Needle's TypeScript scoring against the Python one once
+the reference file exists: `python scripts/needle/make_dev_pack.py && python scripts/scoring_golden.py`.
 
 ## Credits
 
