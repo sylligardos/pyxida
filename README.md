@@ -19,7 +19,7 @@ You need `git` and [Node.js](https://nodejs.org) 20.9 or newer (we use 22).
    git clone https://github.com/sylligardos/pyxida.git
    cd pyxida
    ```
-2. Get the data: download `pyxida-data.zip` from **ZENODO_LINK** (3 GB,
+2. Get the data: download `pyxida-data.zip` from [Zenodo](https://doi.org/10.5281/zenodo.23419645) (3 GB,
    about 10 GB unpacked: the exported series and scores, not the raw
    benchmarks) and unzip it from the repo root, so it fills `data/`:
    ```bash
