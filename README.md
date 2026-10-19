@@ -116,7 +116,7 @@ The paper is under submission. Until it is out, please cite the data.
 ```bibtex
 @dataset{sylligardos2026pyxida,
   author    = {Sylligardos, Emmanouil},
-  title     = {Pyxida: demo data (exported series, detector scores and Needle packs)},
+  title     = {Pyxida: demo data (series, detector scores and processed data)},
   publisher = {Zenodo},
   year      = {2026},
   version   = {1.0},
