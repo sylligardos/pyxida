@@ -278,7 +278,7 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
             <div className="chips">
               {pins.map((d) => (
                 <span key={d} className="chip">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFE14D" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 17v5M8 3h8l-1 7 3 3H6l3-3z" /></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 17v5M8 3h8l-1 7 3 3H6l3-3z" /></svg>
                   {d}
                   <button type="button" aria-label={`Unpin ${d}`} onClick={() => setPins(pins.filter((p) => p !== d))}>×</button>
                 </span>
@@ -300,13 +300,13 @@ export function WorkbenchView({ summary, landscape, state, initial, explicit, pi
             </div>
           </div>
           <div className="ctl">
-            <button type="button" className={`btn ${lucky ? "btn-primary" : "btn-outline"}`} aria-pressed={lucky} onClick={toggleLucky} style={{ height: 44, fontSize: 15, background: lucky ? "#FB923C" : undefined, borderColor: "#FB923C", color: lucky ? "#1C1500" : "#FB923C" }}>
+            <button type="button" className={`btn ${lucky ? "btn-primary" : "btn-outline"}`} aria-pressed={lucky} onClick={toggleLucky} style={{ height: 44, fontSize: 15, background: lucky ? "var(--lucky)" : undefined, borderColor: "var(--lucky)", color: lucky ? "#1C1500" : "var(--lucky)" }}>
               I&apos;m feeling lucky
             </button>
             {lucky ? (
               <>
-                <label className="lbl" htmlFor="wb-k" style={{ marginTop: 8 }}>Window k <span style={{ color: "#FB923C" }}>{k}</span></label>
-                <input id="wb-k" type="range" min={2} max={MAX_K} step={1} value={k} onChange={(e) => setK(Number(e.target.value))} style={{ accentColor: "#FB923C", height: 40, margin: 0, width: "100%" }} />
+                <label className="lbl" htmlFor="wb-k" style={{ marginTop: 8 }}>Window k <span style={{ color: "var(--lucky)" }}>{k}</span></label>
+                <input id="wb-k" type="range" min={2} max={MAX_K} step={1} value={k} onChange={(e) => setK(Number(e.target.value))} style={{ accentColor: "var(--lucky)", height: 40, margin: 0, width: "100%" }} />
                 <span className="muted" style={{ fontSize: 12 }}>Keogh&apos;s one-liners, run live on this series and scored by AUC-PR.</span>
               </>
             ) : <span className="muted" style={{ fontSize: 12 }}>Run eight one-line detectors on this series.</span>}

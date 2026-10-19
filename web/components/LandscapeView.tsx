@@ -122,19 +122,19 @@ export function LandscapeView({ data, state }: { data: Landscape; state: State }
         <figure className="surface ls-chart">
           <div className="head">
             <span className="key">
-              <span><i style={{ width: 9, height: 9, borderRadius: "50%", background: "#C9C3E6" }} aria-hidden="true" />a series</span>
+              <span><i style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--text-2)" }} aria-hidden="true" />a series</span>
               <span><i style={{ width: 14, height: 9, border: "1.5px solid var(--det)", background: "rgba(34,211,238,0.14)" }} aria-hidden="true" />spread of the {group === "dataset" ? "dataset" : "entity type"}</span>
             </span>
           </div>
           <div>
             <svg viewBox={`0 0 ${width} ${HEIGHT}`} width="100%" style={{ height: "auto" }} role="img"
               aria-label={`One box per ${group}, every series a point, sorted hardest first.`}>
-              {[1, 0.75, 0.5, 0.25].map((v) => <line key={v} x1={LEFT} y1={y(v)} x2={width - 8} y2={y(v)} stroke="#1F1B45" />)}
-              <line x1={LEFT} y1={y(0)} x2={width - 8} y2={y(0)} stroke="#2C2754" />
+              {[1, 0.75, 0.5, 0.25].map((v) => <line key={v} x1={LEFT} y1={y(v)} x2={width - 8} y2={y(v)} stroke="var(--grid)" />)}
+              <line x1={LEFT} y1={y(0)} x2={width - 8} y2={y(0)} stroke="var(--border)" />
               <text transform={`rotate(-90 14 ${(TOP + BOTTOM) / 2})`} x={14} y={(TOP + BOTTOM) / 2} textAnchor="middle"
-                fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{metricLabel}</text>
+                fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{metricLabel}</text>
               {[1, 0.5, 0].map((v) => (
-                <text key={v} x={LEFT - 8} y={y(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{v === 0 ? "0" : v.toFixed(1)}</text>
+                <text key={v} x={LEFT - 8} y={y(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{v === 0 ? "0" : v.toFixed(1)}</text>
               ))}
               {groups.map((g, i) => {
                 const cx = LEFT + cw * (i + 0.5), bw = Math.min(30, cw - 16);
@@ -147,17 +147,17 @@ export function LandscapeView({ data, state }: { data: Landscape; state: State }
                     <line x1={cx} y1={y(g.q1)} x2={cx} y2={y(mn)} stroke="#22D3EE" strokeWidth="1.2" />
                     <rect className="boxfill" x={cx - bw / 2} y={y(g.q3)} width={bw} height={Math.max(1, y(g.q1) - y(g.q3))}
                       fill="rgba(34,211,238,0.14)" stroke="#22D3EE" strokeWidth="1.4" />
-                    <line x1={cx - bw / 2} y1={y(g.med)} x2={cx + bw / 2} y2={y(g.med)} stroke="#F4F1FF" strokeWidth="2" />
+                    <line x1={cx - bw / 2} y1={y(g.med)} x2={cx + bw / 2} y2={y(g.med)} stroke="var(--text)" strokeWidth="2" />
                     {g.rows.map((r) => {
                       return (
                         <circle key={r.file} className="pt" cx={cx + jitter(r.file) * (bw - 6)} cy={y(r.score)} r={2.2}
-                          fill="rgba(201,195,230,0.6)">
+                          fill="var(--text-3)">
                           <title>{`${r.file}\n${metricLabel} ${r.score.toFixed(3)}`}</title>
                         </circle>
                       );
                     })}
                     <text transform={`rotate(-40 ${cx + 8} ${LABEL_Y})`} x={cx + 8} y={LABEL_Y} textAnchor="end"
-                      fontFamily="var(--mono)" fontSize="11" fontWeight={isScoped ? 700 : 400} fill={isScoped ? "#FFE14D" : "#C9C3E6"}>{g.name}</text>
+                      fontFamily="var(--mono)" fontSize="11" fontWeight={isScoped ? 700 : 400} fill={isScoped ? "var(--yellow)" : "var(--text-2)"}>{g.name}</text>
                   </g>
                 );
               })}

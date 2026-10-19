@@ -34,6 +34,7 @@ You need `git` and [Node.js](https://nodejs.org) 20.9 or newer (we use 22).
    npm run dev
    ```
 4. Open http://localhost:3000. The game is at http://localhost:3000/play.
+   The moon/sun button in the top bar switches between dark and light mode.
    If port 3000 is taken, use `PORT=3001 npm run dev`.
 
 ## Your own benchmark

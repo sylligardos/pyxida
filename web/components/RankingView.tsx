@@ -193,12 +193,12 @@ export function RankingView({ data, state }: { data: Landscape; state: State }) 
           <div className="rk-scroll">
             <svg viewBox={`0 0 ${RIGHT + 24} ${HEIGHT}`} width="100%" style={{ height: "auto" }} role="img"
               aria-label="One box per detector, best median first; under it, how many series of the selected group each detector solves.">
-              {[1, 0.75, 0.5, 0.25].map((v) => <line key={v} x1={LEFT} y1={y(v)} x2={RIGHT + 16} y2={y(v)} stroke="#1F1B45" />)}
-              <line x1={LEFT} y1={y(0)} x2={RIGHT + 16} y2={y(0)} stroke="#2C2754" />
-              <text transform={`rotate(-90 14 ${(TOP + BOTTOM) / 2})`} x={14} y={(TOP + BOTTOM) / 2} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{metricLabel}</text>
-              {[1, 0.5, 0].map((v) => <text key={v} x={LEFT - 8} y={y(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{v === 0 ? "0" : v.toFixed(1)}</text>)}
-              <line x1={LEFT} y1={SPLIT} x2={RIGHT + 16} y2={SPLIT} stroke="#2C2754" />
-              <text x={RIGHT + 16} y={SPLIT + 15} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">
+              {[1, 0.75, 0.5, 0.25].map((v) => <line key={v} x1={LEFT} y1={y(v)} x2={RIGHT + 16} y2={y(v)} stroke="var(--grid)" />)}
+              <line x1={LEFT} y1={y(0)} x2={RIGHT + 16} y2={y(0)} stroke="var(--border)" />
+              <text transform={`rotate(-90 14 ${(TOP + BOTTOM) / 2})`} x={14} y={(TOP + BOTTOM) / 2} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{metricLabel}</text>
+              {[1, 0.5, 0].map((v) => <text key={v} x={LEFT - 8} y={y(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{v === 0 ? "0" : v.toFixed(1)}</text>)}
+              <line x1={LEFT} y1={SPLIT} x2={RIGHT + 16} y2={SPLIT} stroke="var(--border)" />
+              <text x={RIGHT + 16} y={SPLIT + 15} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">
                 {group === "nobody" ? `No detector reaches ${fmt(floor)} on these series.` : "Series of this group each detector solves"}
               </text>
               {boxes.map((b, i) => {
@@ -211,13 +211,13 @@ export function RankingView({ data, state }: { data: Landscape; state: State }) 
                     <line x1={cx} y1={y(b.q3)} x2={cx} y2={y(b.mx)} stroke="#22D3EE" strokeWidth="1.2" />
                     <line x1={cx} y1={y(b.q1)} x2={cx} y2={y(b.mn)} stroke="#22D3EE" strokeWidth="1.2" />
                     <rect className="boxfill" x={cx - bw / 2} y={y(b.q3)} width={bw} height={Math.max(1, y(b.q1) - y(b.q3))} fill="rgba(34,211,238,0.14)" stroke="#22D3EE" strokeWidth="1.4" />
-                    <line x1={cx - bw / 2} y1={y(b.med)} x2={cx + bw / 2} y2={y(b.med)} stroke="#F4F1FF" strokeWidth="2" />
-                    {b.sample.map((p) => <circle key={p.file} cx={cx + jitter(p.file) * (bw - 6)} cy={y(p.v)} r={2.2} fill="rgba(201,195,230,0.6)" />)}
-                    <text transform={`rotate(-40 ${cx + 8} ${LABEL_Y})`} x={cx + 8} y={LABEL_Y} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fontWeight={top ? 700 : 400} fill={top ? "#F4F1FF" : "#C9C3E6"}>{b.name}</text>
+                    <line x1={cx - bw / 2} y1={y(b.med)} x2={cx + bw / 2} y2={y(b.med)} stroke="var(--text)" strokeWidth="2" />
+                    {b.sample.map((p) => <circle key={p.file} cx={cx + jitter(p.file) * (bw - 6)} cy={y(p.v)} r={2.2} fill="var(--text-3)" />)}
+                    <text transform={`rotate(-40 ${cx + 8} ${LABEL_Y})`} x={cx + 8} y={LABEL_Y} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fontWeight={top ? 700 : 400} fill={top ? "var(--text)" : "var(--text-2)"}>{b.name}</text>
                     {cnt > 0 && (
                       <>
-                        <rect x={cx - bw * 0.3} y={CNT_BOTTOM - ch} width={bw * 0.6} height={ch} fill="#FFE14D" />
-                        <text x={cx} y={CNT_BOTTOM - ch - 5} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fontWeight={700} fill="#FFE14D">{cnt}</text>
+                        <rect x={cx - bw * 0.3} y={CNT_BOTTOM - ch} width={bw * 0.6} height={ch} fill="var(--yellow)" />
+                        <text x={cx} y={CNT_BOTTOM - ch - 5} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fontWeight={700} fill="var(--yellow)">{cnt}</text>
                       </>
                     )}
                   </a>

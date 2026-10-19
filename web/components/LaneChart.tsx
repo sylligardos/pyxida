@@ -8,6 +8,7 @@
 // Positions are point indices: point i owns [i - 0.5, i + 0.5].
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "@/lib/theme";
 
 export type Lane = {
   id: string;
@@ -25,7 +26,17 @@ const SERIES_BUDGET = 320;
 const SERIES_MIN_H = 56;
 const SCORE_H = 78;
 const AXIS_H = 26;
-const COLORS = { line: "#C9C3E6", score: "#22D3EE", lucky: "#FB923C", grid: "#1F1B45", sep: "#2C2754", label: "#FFE14D", text: "#A9A2D4" };
+// Canvas cannot read CSS variables, so the draw reads the current theme's tokens.
+const FALLBACK = { line: "#C9C3E6", score: "#22D3EE", lucky: "#FB923C", grid: "#1F1B45", sep: "#2C2754", label: "#FFE14D", text: "#A9A2D4" };
+const TOKEN = { line: "--text-2", score: "--det", lucky: "--lucky", grid: "--grid", sep: "--border", label: "--yellow", text: "--text-3" } as const;
+function colours(): typeof FALLBACK {
+  if (typeof window === "undefined") return FALLBACK;
+  const css = getComputedStyle(document.documentElement);
+  const out = { ...FALLBACK };
+  for (const k of Object.keys(TOKEN) as (keyof typeof TOKEN)[]) { const v = css.getPropertyValue(TOKEN[k]).trim(); if (v) out[k] = v; }
+  return out;
+}
+const COLORS = { line: "var(--text-2)", score: "var(--det)", lucky: "var(--lucky)", grid: "var(--grid)", sep: "var(--border)", label: "var(--yellow)", text: "var(--text-3)" };
 
 type View = [number, number];
 
@@ -98,8 +109,10 @@ export function LaneChart({ n, lanes, labels, highlight }: {
   const laneH = (lane: Lane) => lane.kind === "series" ? seriesH : SCORE_H;
   const roomy = seriesH >= 120;   // tall series lanes keep the finer grid and padding
 
+  const theme = useTheme();
   const render = useCallback(() => {
     if (!width) return;
+    const C = colours();   // re-read on every draw, so a theme flip repaints
     const dpr = window.devicePixelRatio || 1;
     for (const lane of lanes) {
       const c = canvases.current.get(lane.id);
@@ -111,14 +124,14 @@ export function LaneChart({ n, lanes, labels, highlight }: {
       if (!ctx) continue;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, h);
-      ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
       const rows = lane.kind === "series" && roomy ? 4 : 2;
       for (let r = 1; r < rows; r++) { const y = (h * r) / rows; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
-      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? COLORS.line : lane.kind === "lucky" ? COLORS.lucky : COLORS.score, lane.kind === "series" && roomy ? 10 : 6);
+      drawLine(ctx, lane.values, view, width, h, lane.kind === "series" ? C.line : lane.kind === "lucky" ? C.lucky : C.score, lane.kind === "series" && roomy ? 10 : 6);
     }
   }, [lanes, view, width, seriesH, roomy]);
 
-  useEffect(() => { render(); }, [render]);
+  useEffect(() => { render(); }, [theme, render]);
 
   const xOf = (i: number) => ((i - view[0]) / (view[1] - view[0])) * width;
   const idxOf = (px: number) => view[0] + (px / width) * (view[1] - view[0]);

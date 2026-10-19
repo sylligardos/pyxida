@@ -45,16 +45,16 @@ export function SeriesPlot({ values, labels, title, mark = "bands" }: { values: 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", height: "auto" }} role="img" aria-label={title}>
       {[20, 70, 120, 170, 220].map((gy) => (
-        <line key={gy} x1="0" y1={gy} x2={W} y2={gy} stroke="#1F1B45" strokeWidth="1" />
+        <line key={gy} x1="0" y1={gy} x2={W} y2={gy} stroke="var(--grid)" strokeWidth="1" />
       ))}
       {mark === "bands" && labels.map(([a, b], k) => {
         const x0 = x(a), w = Math.max(3, x(b + 1) - x0);
         return (
           <rect key={k} x={x0.toFixed(1)} y="8" width={w.toFixed(1)} height="224"
-            fill="rgba(255,225,77,0.16)" stroke="#FFE14D" strokeWidth="1.5" strokeDasharray="4 3" rx="2" />
+            fill="rgba(255,225,77,0.16)" stroke="var(--yellow)" strokeWidth="1.5" strokeDasharray="4 3" rx="2" />
         );
       })}
-      <polyline points={pts} fill="none" stroke="#C9C3E6" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={pts} fill="none" stroke="var(--text-2)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
       {red.map(({ seg, cx, cy }, k) => seg.length >= 3
         ? <polyline key={k} points={seg.map(([i, v]) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ")} fill="none" stroke="#F43F5E" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         : <circle key={k} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r="3" fill="#F43F5E" />)}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { KIND_LABEL, KINDS, State, href, hasKind, listBenchmarks, YOUR_DATA } from "@/lib/data";
 import { BenchmarkSelect } from "./BenchmarkSelect";
 import { HelpButton } from "./HelpButton";
+import { ThemeToggle } from "./ThemeToggle";
 
 // Three pages. Needle is the bonus: a pill at the right, not a page.
 const PAGES = [
@@ -24,9 +25,9 @@ export async function TopBar({ state, current }: { state: State; current: string
     <header className="topbar">
       <div className="wrap">
         <Link href={href("/", state)} className="wordmark">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFE14D" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
-            <polygon points="16.2,7.8 14.1,14.1 7.8,16.2 9.9,9.9" fill="#FFE14D" />
+            <polygon points="16.2,7.8 14.1,14.1 7.8,16.2 9.9,9.9" fill="var(--yellow)" />
           </svg>
           <span>Pyxida</span>
         </Link>
@@ -56,6 +57,7 @@ export async function TopBar({ state, current }: { state: State; current: string
             ))}
           </div>
           <Link href={href("/game", state)} className="pill-needle" aria-current={current === "/game" ? "page" : undefined}>Play</Link>
+          <ThemeToggle />
           <HelpButton page={current} />
         </div>
       </div>

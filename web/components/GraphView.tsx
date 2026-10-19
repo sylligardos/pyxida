@@ -20,9 +20,9 @@ type Colour = "dataset" | "type" | "hood" | "n" | "anomalies" | "alen";
 
 const W = 1000, H = 640, PAD = 28;
 const PAGE = 8;
-const PALETTE = ["#22D3EE", "#FF3D9A", "#FFE14D", "#A78BFA", "#34D399", "#FB923C", "#60A5FA", "#F472B6",
+const PALETTE = ["#22D3EE", "#FF3D9A", "var(--yellow)", "#A78BFA", "#34D399", "#FB923C", "#60A5FA", "#F472B6",
   "#A3E635", "#F87171", "#2DD4BF", "#C084FC", "#FBBF24", "#818CF8", "#4ADE80", "#E879F9"];
-const HOODC = ["#FFE14D", "#22D3EE", "#FF3D9A", "#34D399", "#FB923C", "#A78BFA", "#60A5FA", "#A3E635", "#F472B6", "#2DD4BF"];
+const HOODC = ["var(--yellow)", "#22D3EE", "#FF3D9A", "#34D399", "#FB923C", "#A78BFA", "#60A5FA", "#A3E635", "#F472B6", "#2DD4BF"];
 const COLOURS: { id: Colour; label: string }[] = [
   { id: "dataset", label: "Dataset" }, { id: "type", label: "Entity type" }, { id: "hood", label: "Neighbourhood" },
   { id: "n", label: "Length" }, { id: "anomalies", label: "Anomalies" }, { id: "alen", label: "Anomaly length" },
@@ -107,12 +107,12 @@ function Lane({ url, file, h, big, nameColour, tag, tagColour, bar, barColour, o
         {plot ? (
           <>
             {plot.bands.map(([x, w], k) => <rect key={k} x={x.toFixed(1)} y="0" width={w.toFixed(1)} height="60" fill="#FF3D9A" fillOpacity="0.28" />)}
-            <polyline points={plot.pts} fill="none" stroke={big ? "#F4F1FF" : "#C9C3E6"} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
+            <polyline points={plot.pts} fill="none" stroke={big ? "var(--text)" : "var(--text-2)"} strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
           </>
         ) : doc === null ? (
-          <text x="160" y="34" textAnchor="middle" fontSize="10" fill="#A9A2D4">not exported</text>
+          <text x="160" y="34" textAnchor="middle" fontSize="10" fill="var(--text-3)">not exported</text>
         ) : (
-          <line x1="0" y1="30" x2="320" y2="30" stroke="#1F1B45" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line x1="0" y1="30" x2="320" y2="30" stroke="var(--grid)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
         )}
       </svg>
     </div>
@@ -417,7 +417,7 @@ export function GraphView({ summary, landscape, state }: { summary: Summary; lan
                 <span style={{ fontSize: 15 }}>{fmt(h.members.length)} series, {pct(h.topShare)} {h.top}</span>
                 <span className="mono" style={{ fontSize: 11, color: "var(--text-3)" }}>{h.det} wins on {pct(h.share)} of them</span>
               </span>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#A9A2D4" strokeWidth="1.6" aria-hidden="true"><polyline points="5,2 10,7 5,12" /></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text-3)" strokeWidth="1.6" aria-hidden="true"><polyline points="5,2 10,7 5,12" /></svg>
             </button>
           ))}
         </div>

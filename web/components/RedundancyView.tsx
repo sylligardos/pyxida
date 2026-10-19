@@ -123,14 +123,14 @@ export function RedundancyView({ data, state }: { data: Redundancy; state: State
       <span className="lbl" style={{ fontSize: 11, color }}>{title}</span>
       <svg viewBox="0 0 340 350" width="100%" style={{ height: "auto", display: "block" }} role="img"
         aria-label={`Every series as a point: the best single detector's VUS-PR against the ${title}'s. Above the diagonal the stack is better.`}>
-        {[0.25, 0.5, 0.75, 1].map((v) => <line key={v} x1={SX0} y1={sy(v)} x2={SX1} y2={sy(v)} stroke="#1F1B45" />)}
-        <line x1={SX0} y1={SY0} x2={SX1} y2={SY0} stroke="#2C2754" />
-        <line x1={SX0} y1={SY0} x2={SX0} y2={SY1} stroke="#2C2754" />
-        <line x1={SX0} y1={SY0} x2={SX1} y2={SY1} stroke="#A9A2D4" strokeDasharray="4 4" />
-        {[0, 0.5, 1].map((v) => <text key={v} x={SX0 - 8} y={sy(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{v === 0 ? "0" : v === 1 ? "1" : "0.5"}</text>)}
-        {[0, 0.5, 1].map((v) => <text key={v} x={sx(v)} y={SY0 + 18} textAnchor={v === 0 ? "start" : v === 1 ? "end" : "middle"} fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{v === 0 ? "0" : v === 1 ? "1" : "0.5"}</text>)}
-        <text x={(SX0 + SX1) / 2} y={342} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">Best single detector, VUS-PR</text>
-        <text transform={`rotate(-90 12 ${(SY0 + SY1) / 2})`} x={12} y={(SY0 + SY1) / 2} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="#A9A2D4">{title}, VUS-PR</text>
+        {[0.25, 0.5, 0.75, 1].map((v) => <line key={v} x1={SX0} y1={sy(v)} x2={SX1} y2={sy(v)} stroke="var(--grid)" />)}
+        <line x1={SX0} y1={SY0} x2={SX1} y2={SY0} stroke="var(--border)" />
+        <line x1={SX0} y1={SY0} x2={SX0} y2={SY1} stroke="var(--border)" />
+        <line x1={SX0} y1={SY0} x2={SX1} y2={SY1} stroke="var(--text-3)" strokeDasharray="4 4" />
+        {[0, 0.5, 1].map((v) => <text key={v} x={SX0 - 8} y={sy(v) + 4} textAnchor="end" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{v === 0 ? "0" : v === 1 ? "1" : "0.5"}</text>)}
+        {[0, 0.5, 1].map((v) => <text key={v} x={sx(v)} y={SY0 + 18} textAnchor={v === 0 ? "start" : v === 1 ? "end" : "middle"} fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{v === 0 ? "0" : v === 1 ? "1" : "0.5"}</text>)}
+        <text x={(SX0 + SX1) / 2} y={342} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">Best single detector, VUS-PR</text>
+        <text transform={`rotate(-90 12 ${(SY0 + SY1) / 2})`} x={12} y={(SY0 + SY1) / 2} textAnchor="middle" fontFamily="var(--mono)" fontSize="11" fill="var(--text-3)">{title}, VUS-PR</text>
         {rows.map((s) => <circle key={s.file} cx={sx(s.best1)} cy={sy(pick(s))} r={2.4} fill={fill}><title>{`${s.file.replace(/\.csv$/, "")}\nbest single ${fmt(s.best1)} · ${title} ${fmt(pick(s))}`}</title></circle>)}
       </svg>
     </figure>
