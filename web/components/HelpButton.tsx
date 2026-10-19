@@ -43,7 +43,7 @@ export function HelpButton({ page }: { page: string }) {
   if (!HELP[page]) return null;
   const ordered = first ? [...sections.filter((x) => x.title === first), ...sections.filter((x) => x.title !== first)] : sections;
   const used = Array.from(new Set(ordered.flatMap((sec) => sec.entries.flatMap((e) => e.cites ?? [])))).sort((a, b) => a - b);
-  const title = { "/graph": "How the graph works", "/explore": "How Explore works", "/workbench": "How the workbench works", "/game": "How Needle works" }[page] ?? "How this page works";
+  const title = { "/graph": "How the graph works", "/explore": "How Explore works", "/workbench": "How the workbench works", "/game": "How the game works" }[page] ?? "How this page works";
 
   return (
     <>

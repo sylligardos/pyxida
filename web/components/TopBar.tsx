@@ -55,7 +55,7 @@ export async function TopBar({ state, current }: { state: State; current: string
               </Link>
             ))}
           </div>
-          <Link href={href("/game", state)} className="pill-needle" aria-current={current === "/game" ? "page" : undefined}>Needle</Link>
+          <Link href={href("/game", state)} className="pill-needle" aria-current={current === "/game" ? "page" : undefined}>Play</Link>
           <HelpButton page={current} />
         </div>
       </div>

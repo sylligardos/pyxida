@@ -62,7 +62,7 @@ export const HELP: Record<string, HelpSection[]> = {
     ],
   }],
   "/game": [{
-    title: "Needle",
+    title: "The game",
     entries: [
       { term: "The opponent", text: "One detector per series: the one with the highest VUS-PR on that series in the benchmark, out of every detector that was run. You go up against the best there is for that series.", cites: [1, 2] },
       { term: "Its flags", text: "The opponent flags every point where its score rises above a threshold set on that score alone: its mean plus three standard deviations over the window, computed when the series is scored, the same for every detector and every series. Nothing is tuned per detector. Your marks and its flags are judged the same way." },

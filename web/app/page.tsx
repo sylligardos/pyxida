@@ -83,7 +83,7 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
                   <span className="diamond diamond-human" /><span className="diamond diamond-det" />
                 </span>
               </div>
-              <h3 className="needle">Needle</h3>
+              <h3 className="needle">The game</h3>
               <p>Mark the anomaly before the detectors do. A real series, forty seconds, you against a team of detectors. Scores on the booth monitor.</p>
               <Link href={href("/game", state)} style={{ color: "var(--human-soft)" }}>Play a round →</Link>
             </article>
@@ -161,7 +161,7 @@ python scripts/export_graph.py --benchmark <benchmark>`}</pre>
 
       <Footer takeaway="Everything here is one pip install away.">
         <Link href={href("/workbench", state, { sample: "1" })} className="btn btn-primary">Sample a series</Link>
-        <Link href={href("/game", state)} className="btn btn-outline">Play Needle</Link>
+        <Link href={href("/game", state)} className="btn btn-outline">Play the game</Link>
       </Footer>
     </>
   );

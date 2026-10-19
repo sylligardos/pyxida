@@ -180,11 +180,11 @@ async function renderStart() {
         <span style="display:flex;gap:18px;align-items:center">${location.pathname.startsWith('/play') ? '<a class="back-link" href="/">← Back to the demo</a>' : ''}<span style="color:var(--yellow)">Hi-score ${st.hi_score === null || st.hi_score === undefined ? '—' : fmtTot(st.hi_score)}</span></span>
         <span style="color:var(--text-4)">${WORDS[data.round_size].toLowerCase()} series a round</span>
         <span class="top-right"><span style="color:var(--det-soft)">${data.team_size} detectors in the pool</span>
-          <button class="hud-btn help-btn" type="button" id="help" title="How Needle works" aria-label="How Needle works" hidden>?</button>
+          <button class="hud-btn help-btn" type="button" id="help" title="How the game works" aria-label="How the game works" hidden>?</button>
           <button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
       </div>
       <div class="start-title">
-        <h1>NEEDLE</h1>
+        <h1>PYXIDA</h1>
         <p>Can you find what the detectors cannot?</p>
       </div>
       <div class="attract" aria-hidden="true"><div id="attract" class="grow"></div></div>
@@ -510,8 +510,8 @@ function showHelp(h) {
   const refs = used.map((n) => `<p>[${n}] ${h.cites[n].url ? `<a href="${esc(h.cites[n].url)}" target="_blank" rel="noopener">${esc(h.cites[n].label)}</a>` : esc(h.cites[n].label)}</p>`).join('');
   const m = document.createElement('div');
   m.className = 'modal help-modal';
-  m.innerHTML = `<div class="panel modal-card help-card" role="dialog" aria-modal="true" aria-label="How Needle works">
-    <div class="help-head"><h2>HOW NEEDLE WORKS</h2><button class="hud-btn" type="button" id="help-close" aria-label="Close">×</button></div>
+  m.innerHTML = `<div class="panel modal-card help-card" role="dialog" aria-modal="true" aria-label="How the game works">
+    <div class="help-head"><h2>HOW THE GAME WORKS</h2><button class="hud-btn" type="button" id="help-close" aria-label="Close">×</button></div>
     <dl class="help-list">${rows}</dl>
     ${refs ? `<div class="help-refs">${refs}</div>` : ''}
   </div>`;
@@ -740,7 +740,7 @@ async function renderBoard(highlight = null) {
 
   show('board', `<div class="page fit dots board-page">
     <header class="board-head">
-      <div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" style="fill:none;stroke-width:1.8px;stroke-linecap:round;stroke-linejoin:round"><path d="M2 15 L6 13 L9 16 L12 9 L15 14 L18 12 L22 13" style="stroke:#22D3EE"/><path d="M12 2 L12 22" style="stroke:#FF3D9A"/></svg>NEEDLE</div>
+      <div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" style="fill:none;stroke-width:1.8px;stroke-linecap:round;stroke-linejoin:round"><path d="M2 15 L6 13 L9 16 L12 9 L15 14 L18 12 L22 13" style="stroke:#22D3EE"/><path d="M12 2 L12 22" style="stroke:#FF3D9A"/></svg>PYXIDA</div>
       <h1 class="glitch">HIGH SCORES</h1>
       <span class="top-right"><span class="when">Today · ICDE 2027</span><button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
     </header>

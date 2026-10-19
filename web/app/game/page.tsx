@@ -34,12 +34,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
               <span>You <span style={{ color: "var(--human)" }}>◆</span> vs <span style={{ color: "var(--det)" }}>◆</span> detectors</span>
               <span>Booth monitor · ICDE 2027</span>
             </div>
-            <h2 className="needle-hero">Needle</h2>
+            <h2 className="needle-hero">Pyxida</h2>
             <p className="cab-text">A real series from the benchmark. Forty seconds. Mark where the anomaly is, then see the label and what the detectors flagged.</p>
             <div className="cab-play">
               <a href="/play" target="_blank" rel="noopener" className="btn btn-primary" style={{ height: 60, padding: "0 32px", fontSize: 18, fontWeight: 700 }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20" /></svg>
-                Play Needle
+                Play
               </a>
               <span className="muted" style={{ fontSize: 13 }}>Opens in a new tab, with sound. About three minutes a round.</span>
             </div>

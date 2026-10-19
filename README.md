@@ -5,7 +5,7 @@
 The demo behind the ICDE 2027 demo paper *Pyxida*. It is a web app that
 reads a time-series anomaly detection benchmark series by series (which
 datasets are still open, which detectors matter, what they did on any one
-series), plus **Needle**, a game where you mark anomalies against the best
+series), plus **the game**, where you mark anomalies against the best
 detector.
 
 It ships with TSB-AD, TSB-UAD and small examples from TimeEval, TAB and
@@ -33,7 +33,7 @@ You need `git` and [Node.js](https://nodejs.org) 20.9 or newer (we use 22).
    npm install
    npm run dev
    ```
-4. Open http://localhost:3000. Needle is at http://localhost:3000/play.
+4. Open http://localhost:3000. The game is at http://localhost:3000/play.
    If port 3000 is taken, use `PORT=3001 npm run dev`.
 
 ## Your own benchmark
@@ -68,7 +68,7 @@ conda activate pyxida
    python scripts/export_graph.py --benchmark <name> --kind uni
    ```
    Use `--kind multi` for multivariate series.
-4. **Needle** (optional, univariate series only).
+4. **The game** (optional, univariate series only; code name Needle).
    ```bash
    python scripts/needle/build_pack.py --benchmark <name> --per-tier 100 --out data/game/<name>
    ```
