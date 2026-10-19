@@ -12,7 +12,7 @@ const AUTHOR = {
   email: "emmanouil.sylligardos@ens.fr",
 };
 const REPO = "https://github.com/sylligardos/pyxida";
-const TEMPLATE = "https://github.com/sylligardos/tsad-template";
+const DATA = "https://doi.org/10.5281/zenodo.23419645";
 const TSB_AD = "https://github.com/thedatumorg/TSB-AD";
 
 export default async function Intro({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -28,11 +28,11 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
         <section className="wrap hero">
           <p className="eyebrow">ICDE 2027 demo</p>
           <h1>
-            See what is still <span style={{ color: "var(--human)" }}>unsolved</span> in time series anomaly detection, and who is pushing it.
+            Up close and personal with time series anomaly detection benchmarks.
           </h1>
           <p className="lede">
-            Jump-start your work on a correct foundation. The parser gives you the data and the evaluation,
-            the template gives you the project, and this demo tells you what to run and where to look.
+            A benchmark gives you one number per detector. Pyxida reads it series by series: which series are still{" "}
+            <span style={{ color: "var(--human)" }}>unsolved</span>, which detectors own the hard cases, and which ones overlap.
           </p>
           <p className="author">
             {AUTHOR.name} · {AUTHOR.affiliation} · {AUTHOR.location} · <a href={`mailto:${AUTHOR.email}`}>{AUTHOR.email}</a>
@@ -62,48 +62,55 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
         )}
 
         <section className="wrap section">
-          <h2>What you can do with it</h2>
+          <h2>Four ways in</h2>
           <div className="cards">
             <article className="panel card">
-              <div className="top"><span>01</span><span className="diamond diamond-human-hollow" aria-hidden="true" /></div>
+              <div className="top"><span>01</span><span className="diamond diamond-det" aria-hidden="true" /></div>
+              <h3>Graph</h3>
+              <p>Every series is a dot, and two series are linked when the same detectors stand out on both. Nothing but the scores goes in, and neighbourhoods come out.</p>
+              <Link href={href("/graph", state)}>Open the graph →</Link>
+            </article>
+            <article className="panel card">
+              <div className="top"><span>02</span><span className="diamond diamond-human-hollow" aria-hidden="true" /></div>
               <h3>Explore</h3>
-              <p>Every series scored by the best detector on it. Which datasets and anomaly types are still open, and which the top five already solve.</p>
+              <p>The landscape puts the unsolved series at the top. Rankings show how many detectors solve each series and who owns the hard ones. Redundancy shows which detectors flag the same points.</p>
               <Link href={href("/explore", state)}>Open the landscape →</Link>
             </article>
             <article className="panel card">
-              <div className="top"><span>02</span><span className="diamond diamond-det" aria-hidden="true" /></div>
+              <div className="top"><span>03</span><span className="diamond diamond-det" aria-hidden="true" /></div>
               <h3>Workbench</h3>
-              <p>One series at a time, its labels, and what the detectors did on it, aligned in time. Every click on a series anywhere lands here.</p>
+              <p>One series at a time, its labels, and what the detectors did on it, aligned in time. Keep notes, pin detectors, run one-liners against the real ones.</p>
               <Link href={href("/workbench", state, { sample: "1" })}>Sample a series →</Link>
             </article>
             <article className="panel card">
               <div className="top">
-                <span>03</span>
+                <span>04</span>
                 <span style={{ display: "inline-flex", gap: 8 }} aria-hidden="true">
                   <span className="diamond diamond-human" /><span className="diamond diamond-det" />
                 </span>
               </div>
               <h3 className="needle">The game</h3>
-              <p>Mark the anomaly before the detectors do. A real series, forty seconds, you against a team of detectors. Scores on the booth monitor.</p>
+              <p>Mark the anomaly before the best detector does. A real series, under a minute, you against the best detector for that series. Hard mode is mostly series that no detector solves.</p>
               <Link href={href("/game", state)} style={{ color: "var(--human-soft)" }}>Play a round →</Link>
             </article>
           </div>
         </section>
 
         <section className="wrap section">
-          <h2>The parser, in six lines</h2>
+          <h2>Why series by series</h2>
           <div className="parser">
-            <div className="code-col">
-              <pre className="code">
-                <span className="kw">from</span> pyxida <span className="kw">import</span> TSBADParser{"\n\n"}
-                parser = TSBADParser(benchmark=<span className="str">&quot;{state.benchmark}&quot;</span>, kind=<span className="str">&quot;{state.kind}&quot;</span>){"\n"}
-                names, series, labels = parser.load_timeseries({"\n"}
-                {"    "}filename=[<span className="str">&quot;{summary?.demo_series ?? "<series file>"}&quot;</span>]){"\n"}
-                parser.visualize_timeseries(series[0], anomaly_labels=labels[0],{"\n"}
-                {"    "}title=names[0])
-              </pre>
+            <div className="code-col why">
+              <p>
+                No detector is the best on every series. Model selection is one way to live with that: a selector looks at a series and picks the detector to run on it.
+                Under model selection the pool is only as good as its best member on each series, so a detector that solves series the others miss is worth more than another generally good one.
+                And a series on which every detector scores low stays unsolved whatever the selector picks.
+              </p>
+              <p>
+                Benchmarks report averages and rankings, which say which detector is best overall and nothing about the series underneath.
+                The per-series scores are there; the standard views collapse them. Pyxida opens them up.
+              </p>
               <p className="links">
-                <a href={REPO}>Pyxida repo</a> · <a href={TEMPLATE}>Project template</a> · <a href={TSB_AD}>TSB-AD</a>
+                <a href={REPO}>Code</a> · <a href={DATA}>Data on Zenodo</a> · <a href={TSB_AD}>TSB-AD</a>
               </p>
             </div>
             <figure className="surface">
@@ -116,7 +123,7 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
               ) : (
                 <p className="muted" style={{ padding: "60px 0", textAlign: "center" }}>Export a series to draw it here.</p>
               )}
-              <figcaption>The plot is what those six lines produce. Labeled anomalies in yellow, the same yellow as in the game.</figcaption>
+              <figcaption>One series of the benchmark, labeled anomalies in yellow. The workbench shows what every detector did on it.</figcaption>
             </figure>
           </div>
         </section>
@@ -124,7 +131,7 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
         <section className="wrap section" id="your-data">
           <h2>Run it on your data</h2>
           <p className="soft" style={{ maxWidth: "60em", marginTop: -8 }}>
-            Any folder in the format below opens in every page of this demo. TSB-AD drops in unchanged; the repo has converters for TSB-UAD, TAB, TimeEval and mTSBench.
+            Pyxida is not tied to a benchmark. Any folder in the format below opens in every page of this demo, your own included. TSB-AD drops in unchanged; the repo has converters for TSB-UAD, TAB, TimeEval and mTSBench.
           </p>
           <div className="steps">
             <article className="panel step">
@@ -159,7 +166,7 @@ python scripts/export_graph.py --benchmark <benchmark>`}</pre>
         </section>
       </main>
 
-      <Footer takeaway="Everything here is one pip install away.">
+      <Footer takeaway="Any benchmark in this format reads the same way.">
         <Link href={href("/workbench", state, { sample: "1" })} className="btn btn-primary">Sample a series</Link>
         <Link href={href("/game", state)} className="btn btn-outline">Play the game</Link>
       </Footer>

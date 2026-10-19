@@ -197,7 +197,7 @@ code.inline {
 .section > h2 { font-size: 30px; font-weight: 500; letter-spacing: -0.01em; }
 
 .cards { display: flex; flex-wrap: wrap; gap: 20px; }
-.card { flex: 1 1 300px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.card { flex: 1 1 260px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
 .card .top { display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-size: 13px; color: var(--text-3); }
 .card h3 { font-size: 22px; font-weight: 600; }
 .card h3.needle {
@@ -480,3 +480,8 @@ button.note-open:hover { color: var(--text); text-decoration: underline; }
   color: var(--text-3); display: inline-flex; align-items: center; justify-content: center; flex: none;
 }
 .theme-btn:hover { color: var(--text); border-color: var(--text-3); }
+
+/* ---- intro: the why, next to the series plot ---- */
+.parser .why { gap: 16px; justify-content: center; }
+.parser .why p { font-size: 16px; line-height: 1.6; color: var(--text-2); max-width: 40em; }
+.parser .why p.links { font-size: 13px; color: var(--text-3); }
