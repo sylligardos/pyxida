@@ -23,6 +23,7 @@ data/scores
 data/metrics
 data/runtime
 data/notes.json
+pyxida-data.zip
 
 # ── Test / cache ──────────────────────────────────────────────────────────────
 .pytest_cache/
