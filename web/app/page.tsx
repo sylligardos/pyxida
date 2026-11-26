@@ -26,7 +26,6 @@ export default async function Intro({ searchParams }: { searchParams: Promise<Re
       <TopBar state={state} current="/" />
       <main>
         <section className="wrap hero">
-          <p className="eyebrow">ICDE 2027 demo</p>
           <h1>
             Up close and personal with time series anomaly detection benchmarks.
           </h1>

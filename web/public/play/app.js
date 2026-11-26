@@ -742,7 +742,7 @@ async function renderBoard(highlight = null) {
     <header class="board-head">
       <div class="logo"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" style="fill:none;stroke-width:1.8px;stroke-linecap:round;stroke-linejoin:round"><path d="M2 15 L6 13 L9 16 L12 9 L15 14 L18 12 L22 13" style="stroke:#22D3EE"/><path d="M12 2 L12 22" style="stroke:#FF3D9A"/></svg>PYXIDA</div>
       <h1 class="glitch">HIGH SCORES</h1>
-      <span class="top-right"><span class="when">Today · ICDE 2027</span><button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
+      <span class="top-right"><span class="when">Today · EDBT 2027</span><button class="hud-btn" type="button" data-mute title="Music and sounds on or off (M)"></button></span>
     </header>
     <div class="board-wrap">
       <section class="cabinet board" aria-label="Leaderboard">

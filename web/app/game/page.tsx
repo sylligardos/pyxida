@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
             <div className="attract-q" aria-hidden="true"><span>?</span></div>
             <div className="cab-top">
               <span>You <span style={{ color: "var(--human)" }}>◆</span> vs <span style={{ color: "var(--det)" }}>◆</span> detectors</span>
-              <span>Booth monitor · ICDE 2027</span>
+              <span>Booth monitor · EDBT 2027</span>
             </div>
             <h2 className="needle-hero">Pyxida</h2>
             <p className="cab-text">A real series from the benchmark. Forty seconds. Mark where the anomaly is, then see the label and what the detectors flagged.</p>

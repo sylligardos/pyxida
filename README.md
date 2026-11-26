@@ -2,7 +2,7 @@
 
 <h1 align="center">Pyxida</h1>
 
-The demo behind the ICDE 2027 demo paper *Pyxida*. It is a web app that
+The demo behind the EDBT 2027 demo paper *Pyxida*. It is a web app that
 reads a time-series anomaly detection benchmark series by series (which
 datasets are still open, which detectors matter, what they did on any one
 series), plus **the game**, where you mark anomalies against the best
